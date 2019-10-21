@@ -546,6 +546,10 @@ namespace ldso {
         delete[] noiseMapY;
     }
 
+    /**
+     * @brief 去畸变后计算新的pinhole内参K, 将原模型等效映射到pinhole
+     * 
+     **/
     void Undistort::makeOptimalK_crop() {
         printf("finding CROP optimal new model!\n");
         K.setIdentity();
@@ -864,6 +868,9 @@ namespace ldso {
 
     }
 
+
+// ********************* 以下是各种相机模型的定义和有无畸变之间的变换 ****************
+// ***********************************************************************************
 
     UndistortFOV::UndistortFOV(const char *configFileName, bool noprefix) {
         printf("Creating FOV undistorter\n");

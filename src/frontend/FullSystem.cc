@@ -1258,7 +1258,7 @@ namespace ldso {
                 }
             }
         }
-
+        //! LDSO: 这里没有删除point; DSO: 删除了PointHessian, 所以没法保证全局一致
         LOG(INFO) << "Flag: nores: " << flag_nores << ", oob: " << flag_oob << ", marged: " << flag_inin << endl;
     }
 

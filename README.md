@@ -1,5 +1,7 @@
 # LDSO: Direct Sparse Odometry with Loop Closure
 
+## 正在注释中，不是完整版，主要进行mapping & loop
+
 ## Related Publications
 
  * **LDSO: Direct Sparse Odometry with Loop Closure**, *X. Gao, R. Wang, N. Demmel, D. Cremers*,
