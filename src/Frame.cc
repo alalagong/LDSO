@@ -20,27 +20,36 @@ namespace ldso {
         id = nextId++;
         this->timeStamp = timestamp;
     }
-
+    /**
+     * @brief 删除FrameHessian
+     ***/
     void Frame::ReleaseFH() {
         if (frameHessian) {
             frameHessian->frame = nullptr;
             frameHessian = nullptr;
         }
     }
-
+    /**
+     * @brief 删除帧上所有点
+     ***/
     void Frame::ReleaseFeatures() {
         for (auto &feat: features) {
             feat->ReleaseAll();
         }
     }
-
+    /**
+     * @brief 创建当前frame的Hessian
+     ***/
     void Frame::CreateFH(shared_ptr<Frame> frame) {
         frameHessian = shared_ptr<internal::FrameHessian>(new internal::FrameHessian(frame));
     }
-
+    /**
+     * @brief 设置每个网格内的点id
+     ***/
     void Frame::SetFeatureGrid() {
         int gw = wG[0] / gridSize, gh = hG[0] / gridSize;
-        grid.resize(gw * gh);
+        // 网格数
+        grid.resize(gw * gh);  
         for (size_t i = 0; i < features.size(); i++) {
             if (features[i]->isCorner) {
                 // assign feature to grid
@@ -50,9 +59,16 @@ namespace ldso {
             }
         }
     }
-
+    /**
+     * @brief 找到在点(x,y)半径radius范围内的所有点
+     * 
+     * @param x         点的坐标
+     * @param y
+     * @param radius    点所覆盖的半径大小
+     ***/
     vector<size_t> Frame::GetFeatureInGrid(const float &x, const float &y, const float &radius) {
         vector<size_t> indices;
+        // 找到覆盖的网格范围
         int gw = wG[0] / gridSize, gh = hG[0] / gridSize;
 
         int gridXmin = max(0, int(x - radius) / gridSize);
@@ -70,7 +86,7 @@ namespace ldso {
             return indices;
 
         float r2 = radius * radius;
-
+        // 遍历网格中的特征点,找到小于半径radius的
         for (int ix = gridXmin; ix <= gridXmax; ix++)
             for (int iy = gridYmin; iy <= gridYmax; iy++) {
                 const vector<size_t> cell = grid[iy * gw + ix];
@@ -84,7 +100,9 @@ namespace ldso {
             }
         return indices;
     }
-
+    /**
+     * @brief 计算帧的特征点向量, 和词袋向量
+     ***/
     void Frame::ComputeBoW(shared_ptr<ORBVocabulary> voc) {
         // convert corners into BoW
         vector<cv::Mat> allDesp;
@@ -100,14 +118,18 @@ namespace ldso {
         }
         voc->transform(allDesp, bowVec, featVec, 4);
     }
-
+    /**
+     * @brief 得到和当前帧连接的关键帧
+     ***/
     set<shared_ptr<Frame>> Frame::GetConnectedKeyFrames() {
         set<shared_ptr<Frame>> connectedFrames;
         for (auto &rel: poseRel)
             connectedFrames.insert(rel.first);
         return connectedFrames;
     }
-
+    /**
+     * @brief 得到当前帧上特征点对应的地图点
+     ***/
     vector<shared_ptr<Point>> Frame::GetPoints() {
         vector<shared_ptr<Point>> pts;
         for (auto &feat: features) {
@@ -117,17 +139,22 @@ namespace ldso {
         }
         return pts;
     }
-
+    /**
+     * @brief 保存帧的信息
+     ***/
     void Frame::save(ofstream &fout) {
-
+        
+        // id
         fout.write((char *) &id, sizeof(id));
         fout.write((char *) &kfId, sizeof(kfId));
 
+        // 位姿
         Mat44 Tcw = this->Tcw.matrix();
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
                 fout.write((char *) &Tcw(i, j), sizeof(double));
 
+        // 特征点
         int nFeature = features.size();
 
         fout.write((char *) &nFeature, sizeof(nFeature));
@@ -135,6 +162,7 @@ namespace ldso {
             feat->save(fout);   // save the feats
         }
 
+        // 关键帧间的关系
         // save relationship with other keyframes
         int nPoseRel = poseRel.size();
         fout.write((char *) &nPoseRel, sizeof(nPoseRel));
@@ -148,7 +176,9 @@ namespace ldso {
         }
 
     }
-
+    /**
+     * @brief 加载帧的信息
+     ***/
     void Frame::load(ifstream &fin, shared_ptr<Frame> &thisFrame, vector<shared_ptr<Frame>> &allKF) {
 
         fin.read((char *) &id, sizeof(id));

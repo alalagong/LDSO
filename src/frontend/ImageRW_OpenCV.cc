@@ -9,6 +9,9 @@
 namespace ldso {
 
     namespace IOWrap {
+        /**
+         * @brief 读取灰度图像
+         ***/
         MinimalImageB *readImageBW_8U(std::string filename) {
             cv::Mat m = cv::imread(filename, cv::IMREAD_GRAYSCALE);
             if (m.rows * m.cols == 0) {
@@ -23,7 +26,9 @@ namespace ldso {
             memcpy(img->data, m.data, m.rows * m.cols);
             return img;
         }
-
+        /**
+         * @brief 读取彩色图像
+         ***/
         MinimalImageB3 *readImageRGB_8U(std::string filename) {
             cv::Mat m = cv::imread(filename, cv::IMREAD_COLOR);
             if (m.rows * m.cols == 0) {
@@ -38,7 +43,9 @@ namespace ldso {
             memcpy(img->data, m.data, 3 * m.rows * m.cols);
             return img;
         }
-
+        /**
+         * @brief 读取16U灰度图像(IMREAD_UNCHANGED)
+         ***/
         MinimalImage<unsigned short> *readImageBW_16U(std::string filename) {
             cv::Mat m = cv::imread(filename, cv::IMREAD_UNCHANGED);
             if (m.rows * m.cols == 0) {
@@ -53,7 +60,9 @@ namespace ldso {
             memcpy(img->data, m.data, 2 * m.rows * m.cols);
             return img;
         }
-
+        /**
+         * @brief 从压缩的数据中解码图像
+         ***/        
         MinimalImageB *readStreamBW_8U(char *data, int numBytes) {
             cv::Mat m = cv::imdecode(cv::Mat(numBytes, 1, CV_8U, data), cv::IMREAD_GRAYSCALE);
             if (m.rows * m.cols == 0) {
@@ -69,7 +78,9 @@ namespace ldso {
             return img;
         }
 
-
+        /**
+         * @brief 保存各类图像
+         ***/        
         void writeImage(std::string filename, MinimalImageB *img) {
             cv::imwrite(filename, cv::Mat(img->h, img->w, CV_8U, img->data));
         }

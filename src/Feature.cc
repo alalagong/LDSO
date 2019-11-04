@@ -11,6 +11,9 @@ using namespace ldso::internal;
 
 namespace ldso {
 
+    /**
+     * @brief  从未成熟点创建一个特征点、地图点 
+     ***/
     void Feature::CreateFromImmature() {
         if (point) {
             LOG(WARNING) << "Map point already created! You cannot create twice! " << endl;
@@ -22,20 +25,26 @@ namespace ldso {
         point->mpPH->point = point;   // set the point hessians backward pointer
         status = Feature::FeatureStatus::VALID;
     }
-
+    /**
+     * @brief  删除未成熟点
+     ***/
     void Feature::ReleaseImmature() {
         if (ip) {
             ip->feature = nullptr;
             ip = nullptr;
         }
     }
-
+    /**
+     * @brief  删除地图点
+     ***/
     void Feature::ReleaseMapPoint() {
         if (point) {
             point->ReleasePH();
         }
     }
-
+    /**
+     * @brief  存储地图需要的信息
+     ***/
     void Feature::save(ofstream &fout) {
         fout.write((char *) &status, sizeof(status));
         fout.write((char *) &uv[0], sizeof(float));
@@ -48,7 +57,9 @@ namespace ldso {
         if (point && status == Feature::FeatureStatus::VALID)
             point->save(fout);
     }
-
+    /**
+     * @brief  加载地图信息
+     ***/
     void Feature::load(ifstream &fin, vector<shared_ptr<Frame>> &allKFs) {
 
         fin.read((char *) &status, sizeof(status));

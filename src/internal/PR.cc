@@ -5,7 +5,9 @@
 using namespace ldso::internal;
 
 namespace ldso {
-
+    /**
+     * @brief 计算逆深度误差
+     ***/
     void EdgeIDPPrior::computeError() {
         const VertexPointInvDepth *vIDP = static_cast<const VertexPointInvDepth *>(_vertices[0]);
         _error(0) = vIDP->estimate() - _measurement;
@@ -19,6 +21,7 @@ namespace ldso {
      */
 
     /**
+     *@brief 计算重投影误差
      * Erorr = pi(Px)-obs
      */
     void EdgePRIDP::computeError() {
@@ -50,7 +53,9 @@ namespace ldso {
         double v = cam->fyl() * yi + cam->cyl();
         _error = Vec2(u, v) - _measurement;
     }
-
+    /**
+     *@brief 计算pose-only的重投影误差(SE3)
+     */
     void EdgeProjectPoseOnly::computeError() {
         const VertexPR *vPR = static_cast<VertexPR *> (_vertices[0]);
         SE3 Tcw = vPR->estimate();
@@ -65,7 +70,9 @@ namespace ldso {
         double v = fy * pc[1] + cy;
         _error = Vec2(u, v) - _measurement;
     }
-
+    /**
+     *@brief 计算pose-only的重投影误差(Sim3)
+     */
     void EdgeProjectPoseOnlySim3::computeError() {
 
         const VertexSim3 *vSim3 = static_cast<VertexSim3 *> (vertex(0));

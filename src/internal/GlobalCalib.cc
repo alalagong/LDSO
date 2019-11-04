@@ -3,7 +3,8 @@
 namespace ldso {
 
     namespace internal {
-
+        
+        // 各层金字塔的相机参数, 相机逆参数
         int wG[PYR_LEVELS], hG[PYR_LEVELS];
         float fxG[PYR_LEVELS], fyG[PYR_LEVELS],
                 cxG[PYR_LEVELS], cyG[PYR_LEVELS];
@@ -16,7 +17,13 @@ namespace ldso {
 
         float wM3G;
         float hM3G;
-
+        /**
+         * @brief 设置全局的相机参数
+         * 
+         * @param w 图像宽
+         * @param h 图像高
+         * @param k 文件读取处理后的等价内参(如果进行crop)
+         ***/
         void setGlobalCalib(int w, int h, const Eigen::Matrix3f &K) {
             int wlvl = w;
             int hlvl = h;

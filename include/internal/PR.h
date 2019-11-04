@@ -25,6 +25,7 @@ namespace ldso {
     // some g2o types will be used in pose graph
     // ---------------------------------------------------------------------------------------------------------
 
+    //@ SE3 类型结点
     class VertexPR : public BaseVertex<6, SE3> {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -54,6 +55,7 @@ namespace ldso {
         }
     };
 
+    // Sim3 类型结点
     class VertexSim3 : public BaseVertex<7, Sim3> {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -75,6 +77,7 @@ namespace ldso {
         }
     };
 
+    //@ 点逆深度结点
     /**
      * point with inverse depth
      */
@@ -102,10 +105,10 @@ namespace ldso {
     // ---- Edges --------------------------------------------------------------------------------------------------
 
     /**
-     * Edge of inverse depth prior for stereo-triangulated mappoints
-     * Vertex: inverse depth map point
+     * @brief: Edge of inverse depth prior for stereo-triangulated mappoints, 逆深度做观测约束
+     * @param: Vertex: inverse depth map point
      *
-     * Note: User should set the information matrix (inverse covariance) according to feature position uncertainty and baseline
+     * @Note: User should set the information matrix (inverse covariance) according to feature position uncertainty and baseline
      */
     class EdgeIDPPrior : public BaseUnaryEdge<1, double, VertexPointInvDepth> {
     public:
@@ -123,8 +126,8 @@ namespace ldso {
     };
 
     /**
-     * Odometry edge
-     * err = T1.inv * T2
+     *@brief Odometry edge, 相对pose做观测约束
+     *@ err = T1.inv * T2
      */
     class EdgePR : public BaseBinaryEdge<6, SE3, VertexPR, VertexPR> {
     public:
@@ -146,7 +149,7 @@ namespace ldso {
     };
 
     /**
-     * Monocular Sim3 edge
+     *@brief: Monocular Sim3 edge, 相对pose+scale做观测约束
      */
     class EdgeSim3 : public BaseBinaryEdge<7, Sim3, VertexSim3, VertexSim3> {
     public:
@@ -179,10 +182,10 @@ namespace ldso {
     };
 
     /**
-    * Edge of reprojection error in one frame. Contain 3 vectices
-    * Vertex 0: inverse depth map point
-    * Veretx 1: Host KF PR
-    * Vertex 2: Target KF PR
+    *@brief: Edge of reprojection error in one frame. Contain 3 vectices
+    *@param: Vertex 0: inverse depth map point
+    *@param: Veretx 1: Host KF PR
+    *@param: Vertex 2: Target KF PR
     **/
     class EdgePRIDP : public BaseMultiEdge<2, Vec2> {
     public:
@@ -211,12 +214,14 @@ namespace ldso {
     protected:
 
         // [x,y] in normalized image plane in reference KF
-        double x = 0, y = 0;
+        double x = 0, y = 0;  // 参考帧单位平面上
         bool linearized = false;
 
         shared_ptr<CalibHessian> cam;
     };
-
+    /**
+     * @brief 只优化当前帧SE3的重投影误差, pose-only-BA
+     ***/
     class EdgeProjectPoseOnly : public BaseUnaryEdge<2, Vector2d, VertexPR> {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -242,7 +247,9 @@ namespace ldso {
         Vector3d pw;    // world 3d position
 
     };
-
+    /**
+     * @brief 只优化当前帧Sim3的重投影误差, pose-only-BA
+     ***/
     class EdgeProjectPoseOnlySim3 : public BaseUnaryEdge<2, Vector2d, VertexSim3> {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -271,6 +278,7 @@ namespace ldso {
     };
 
     /**
+     *@brief 优化Sim3, 测量为相机坐标系3D点的坐标
      * error = measurement - Sim3*pw
      */
     class EdgePointSim3 : public BaseUnaryEdge<3, Vector3d, VertexSim3> {

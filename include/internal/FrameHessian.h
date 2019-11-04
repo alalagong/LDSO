@@ -19,7 +19,8 @@ namespace ldso {
 
         class CalibHessian;
 
-        struct FrameFramePrecalc;
+        //! 帧间相对状态
+        struct FrameFramePrecalc;   
 
         /**
          * Frame hessian is the internal structure used in dso
@@ -39,42 +40,64 @@ namespace ldso {
                 }
             }
 
-            // accessors
+            //***************** accessors *****************
+            /**
+             * @brief 得到相机外参待估计值(也是线性化点)
+             **/ 
             EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {
                 return worldToCam_evalPT;
             }
-
+            /**
+             * @brief 线性化点的位姿增量值(0), 线性化点光度参数值
+             **/ 
             EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {
                 return state_zero;
             }
-
+            /**
+             * @brief (优化后)当前状态的位姿增量值, 线性化点光度参数值
+             **/ 
             EIGEN_STRONG_INLINE const Vec10 &get_state() const {
                 return state;
             }
-
+            /**
+             * @brief (优化后)当前状态的scaled位姿增量值, 线性化点scaled光度参数值
+             **/             
             EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {
                 return state_scaled;
             }
 
             // state - state0
+            /**
+             * @brief (优化后)当前状态(位姿+光度)与线性化点状态增量
+             **/ 
             EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {
                 return get_state() - get_state_zero();
             }
-
+            /**
+             * @brief 位姿左扰动增量, 
+             **/ 
             inline Vec6 w2c_leftEps() const {
                 return get_state_scaled().head<6>();
             }
-
+            /**
+             * @brief 当前光度参数值
+             **/ 
             inline AffLight aff_g2l() {
                 return AffLight(get_state_scaled()[6], get_state_scaled()[7]);
             }
-
+            /**
+             * @brief 线性化点处的光度参数值
+             **/ 
             inline AffLight aff_g2l_0() const {
                 return AffLight(get_state_zero()[6] * SCALE_A, get_state_zero()[7] * SCALE_B);
             }
-
+            // 设置线性化点增量
             void setStateZero(const Vec10 &state_zero);
-
+            /**
+             * @brief 设置当前位姿增量, 更新相机外参&位姿, 设置当前光度参数值
+             * 
+             * @param state  优化后的状态
+             **/ 
             inline void setState(const Vec10 &state) {
 
                 this->state = state;
@@ -88,7 +111,11 @@ namespace ldso {
                 PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
                 PRE_camToWorld = PRE_worldToCam.inverse();
             };
-
+            /**
+             * @brief 设置当前scaled位姿增量, 更新相机外参&位姿, 设置当前scaled光度参数
+             * 
+             * @param state_scaled  优化后的scaled状态
+             **/ 
             inline void setStateScaled(const Vec10 &state_scaled) {
 
                 this->state_scaled = state_scaled;
@@ -102,14 +129,24 @@ namespace ldso {
                 PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
                 PRE_camToWorld = PRE_worldToCam.inverse();
             };
-
+            /**
+             * @brief 设置位姿增量状态, 设置当前光度参数, 并且更新线性化点
+             * 
+             * @param worldToCam_evalPT 当前估计的位姿状态(线性化点)
+             * @param state   当前各状态的增量值
+             **/             
             inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state) {
 
                 this->worldToCam_evalPT = worldToCam_evalPT;
                 setState(state);
                 setStateZero(state);
             };
-
+            /**
+             * @brief 设置scaled位姿增量状态, 设置scaled当前光度参数, 并且更新线性化点
+             * 
+             * @param worldToCam_evalPT  当前估计的位姿状态(线性化点)
+             * @param aff_g2l  当前光度参数值
+             **/   
             // set the pose Tcw
             inline void setEvalPT_scaled(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l) {
                 Vec10 initial_state = Vec10::Zero();
@@ -126,6 +163,9 @@ namespace ldso {
              */
             void makeImages(float *image, const shared_ptr<CalibHessian> &HCalib);
 
+            /**
+             * @brief 各状态的先验Hessian, 第一帧的位姿有, 其他帧没有(0), 光度是一直都有
+             **/   
             inline Vec10 getPrior() {
                 Vec10 p = Vec10::Zero();
                 if (frame->id == 0) {
@@ -205,7 +245,7 @@ namespace ldso {
             // ======================================================================================== //
             // Energy stuffs
             // Frame status: 6 dof pose + 2 dof light param
-            void takeData();        // take data from frame hessian
+            void takeData();                // take data from frame hessian
             Vec8 prior = Vec8::Zero();             // prior hessian (diagonal)
             Vec8 delta_prior = Vec8::Zero();       // = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
             Vec8 delta = Vec8::Zero();             // state - state_zero.

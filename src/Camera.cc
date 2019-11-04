@@ -10,11 +10,15 @@ namespace ldso {
         this->cx = cx;
         this->cy = cy;
     }
-
+    /**
+     * @brief 创建CalibHessian
+     ***/
     void Camera::CreateCH(shared_ptr<Camera> cam) {
         this->mpCH = shared_ptr<CalibHessian>( new CalibHessian(cam) );
     }
-
+    /**
+     * @brief 释放这个函数的CalibHessian, 互相指针置null
+     ***/
     void Camera::ReleaseCH() {
         if ( mpCH ) {
             mpCH->camera = nullptr;

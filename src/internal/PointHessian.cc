@@ -5,7 +5,9 @@
 namespace ldso {
 
     namespace internal {
-
+        /**
+        * @brief 点收敛后, 从rawPoint构建点
+        ***/
         PointHessian::PointHessian(shared_ptr<ImmaturePoint> rawPoint) {
             u = rawPoint->feature->uv[0];
             v = rawPoint->feature->uv[1];

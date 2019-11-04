@@ -9,12 +9,18 @@ namespace ldso {
 
     namespace internal {
 
+        /**
+         * @brief 设置线性化点处各个状态的增量值(光度参数是值)
+         ***/
         void FrameHessian::setStateZero(const Vec10 &state_zero) {
-
+            
+            // 因为线性化点处增量为0, 所以位姿6个应该是0, 光度参数不是
             assert(state_zero.head<6>().squaredNorm() < 1e-20);
 
             this->state_zero = state_zero;
 
+            //! 下面是求位姿和光度参数零空间上的基向量, 用来计算orthogonal projector
+            // 方法是数值求导, 增加正反两个极小增量, 然后除以增量
             for (int i = 0; i < 6; i++) {
                 Vec6 eps;
                 eps.setZero();
@@ -41,6 +47,12 @@ namespace ldso {
             nullspaces_affine.topRightCorner<2, 1>() = Vec2(0, expf(aff_g2l_0().a) * ab_exposure);
         }
 
+        /**
+         * @brief 生成图像金字塔, 计算图像上各层的图像导数
+         * 
+         * @param color 图像辐射值
+         * @param HCalib 相机内参&光度参数
+         ***/
         void FrameHessian::makeImages(float *color, const shared_ptr<CalibHessian> &HCalib) {
 
             for (int i = 0; i < pyrLevelsUsed; i++) {
@@ -112,9 +124,15 @@ namespace ldso {
             }
         }
 
+        /**
+         * @brief 得到该帧的当前状态
+         ***/        
         void FrameHessian::takeData() {
+            // 先验Hessian(协方差逆)
             prior = getPrior().head<8>();
+            // 当前状态和线性化点差
             delta = get_state_minus_stateZero().head<8>();
+            // 当前状态和先验状态差
             delta_prior = (get_state() - getPriorZero()).head<8>();
         }
     }

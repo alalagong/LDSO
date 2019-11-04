@@ -7,7 +7,11 @@
 using namespace ldso::internal;
 namespace ldso {
     unsigned long Point::mNextId = 0;
-
+    /**
+     * @brief 从feature创建一个地图点
+     * 
+     * @param hostFeature
+     ***/
     Point::Point(shared_ptr<Feature> hostFeature) {
         mHostFeature = hostFeature;
         if (hostFeature->ip)    // create from immature point
@@ -23,16 +27,21 @@ namespace ldso {
     Point::Point() {
         id = mNextId++;
     }
-
+    /**
+     * @brief 释放当前点
+     * 
+     ***/
     void Point::ReleasePH() {
         if (mpPH) {
             mpPH->point = nullptr;
             mpPH = nullptr;
         }
     }
-
+    /**
+     * @brief 计算点的世界坐标
+     ***/
     void Point::ComputeWorldPos() {
-        shared_ptr<Feature> feat = mHostFeature.lock();
+        shared_ptr<Feature> feat = mHostFeature.lock();  // weak 获得 shared
         if (feat) {
             shared_ptr<Frame> frame = feat->host.lock();
             if (!frame)
@@ -45,12 +54,16 @@ namespace ldso {
             mWorldPos = Twc * Kip;
         }
     }
-
+    /**
+     * @brief 保存点的信息
+     ***/
     void Point::save(ofstream &fout) {
         fout.write((char *) &id, sizeof(id));
         fout.write((char *) &status, sizeof(status));
     }
-
+    /**
+     * @brief 加载点的信息
+     ***/
     void Point::load(ifstream &fin, vector<shared_ptr<Frame>> &allKFs) {
 
         fin.read((char *) &id, sizeof(id));

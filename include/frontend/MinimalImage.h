@@ -9,6 +9,7 @@ using namespace std;
 
 namespace ldso {
 
+    //************************** 自己定义的图像数据类型 **********************
     template<typename T>
     class MinimalImage {
     public:
