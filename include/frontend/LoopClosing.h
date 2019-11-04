@@ -101,16 +101,23 @@ namespace ldso {
         shared_ptr<Map> globalMap = nullptr;  // global map
 
         // shared_ptr<KeyFrameDatabase> kfDB = nullptr;
+        // 词袋数据库
         shared_ptr<DBoW3::Database> kfDB = nullptr;
+        // 词典
         shared_ptr<ORBVocabulary> voc = nullptr;
-
+        // 候选关键帧
         shared_ptr<Frame> candidateKF = nullptr;
+        // 
         vector<shared_ptr<Frame>> allKF;
+        // 关键帧的数据库id索引
         map<DBoW3::EntryId, shared_ptr<Frame>> checkedKFs;    // keyframes that are recorded.
-        int maxKFId = 0;
+        // 数据库中当前最大的关键帧id
+        int maxKFId = 0;   
+        // 当前帧
         shared_ptr<Frame> currentKF = nullptr;
 
         // loop kf queue
+        // 关键帧序列
         deque<shared_ptr<Frame>> KFqueue;
         mutex mutexKFQueue;
         shared_ptr<CoarseDistanceMap> coarseDistanceMap = nullptr;  // Need distance map to correct the sim3 error

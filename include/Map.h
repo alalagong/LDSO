@@ -48,7 +48,7 @@ namespace ldso {
 
         /**
          * get number of frames stored in global map
-         * @return
+         * @return 关键帧数目
          */
         inline int NumFrames() const {
             return frames.size();

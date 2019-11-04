@@ -29,12 +29,16 @@ namespace ldso {
         mainLoop = thread(&LoopClosing::Run, this);
         idepthMap = new float[wG[0] * hG[0]];
     }
-
+    /**
+     * @brief：向闭环线程插入关键帧
+     ***/
     void LoopClosing::InsertKeyFrame(shared_ptr<Frame> &frame) {
         unique_lock<mutex> lock(mutexKFQueue);
         KFqueue.push_back(frame);
     }
-
+    /**
+     * @brief：闭环检测的主循环, 
+     ***/
     void LoopClosing::Run() {
         finished = false;
 
@@ -44,7 +48,7 @@ namespace ldso {
                 LOG(INFO) << "find loop closing thread need finish flag!" << endl;
                 break;
             }
-
+            // 从关键帧队列最前面取出一帧
             {
                 // get the oldest one
                 unique_lock<mutex> lock(mutexKFQueue);
@@ -58,16 +62,20 @@ namespace ldso {
 
                 if (KFqueue.size() > 20)
                     KFqueue.clear();
-
+                // 加入allKF(好像没啥用)
                 allKF.push_back(currentKF);
             }
-
+            // 计算特征向量
             currentKF->ComputeBoW(voc);
+            // 检测是否有闭环
             if (DetectLoop(currentKF)) {
-                bool mapIdle = globalMap->Idle();
+                // 全局优化是否空闲, 正在运行则false
+                bool mapIdle = globalMap->Idle();  
+                // 计算闭环帧和当前帧之间位姿
                 if (CorrectLoop(Hcalib)) {
                     // start a pose graph optimization
                     if (mapIdle) {
+                        // 进行全局优化
                         LOG(INFO) << "call global pose graph!" << endl;
                         bool ret = globalMap->OptimizeALLKFs();
                         if (ret)
@@ -79,7 +87,7 @@ namespace ldso {
                 }
             }
 
-
+            // 有未完成的全局优化, 则执行
             if (needPoseGraph && globalMap->Idle()) {
                 LOG(INFO) << "run another pose graph!" << endl;
                 if (globalMap->OptimizeALLKFs())
@@ -91,22 +99,29 @@ namespace ldso {
 
         finished = true;
     }
-
+    /**
+     * @brief 检测闭环, 得到闭环候选帧, 更新数据库
+     * @param frame 当前帧
+     ***/
     bool LoopClosing::DetectLoop(shared_ptr<Frame> &frame) {
 
         DBoW3::QueryResults results;
+        // 最多返回一个, 临近的kfGap(10)个帧是不算在内的
         kfDB->query(frame->bowVec, results, 1, maxKFId - kfGap);
-
+        
+        // 如果没有, 则把当前帧加入数据库中
         if (results.empty()) {
             DBoW3::EntryId id = kfDB->add(frame->bowVec, frame->featVec);
             maxKFId = id;
-            checkedKFs[id] = frame;
+            checkedKFs[id] = frame;  // 记录关键帧
             return false;
         }
 
+        // 得到候选闭环帧
         DBoW3::Result r = results[0];
         candidateKF = checkedKFs[r.Id];
 
+        // 找到当前帧相连的帧, 判断候选帧是不是在内
         auto connected = frame->GetConnectedKeyFrames();
         unsigned long minKFId = 9999999, maxKFId = 0;
 
@@ -125,10 +140,12 @@ namespace ldso {
         LOG(INFO) << "candidate kf id: " << candidateKF->kfId << ", max id: " << maxKFId << ", min id: " << minKFId
                   << endl;
 
+        // 如果得分小, 区别度大, 则也加入数据库
         if (r.Score < minScoreAccept) {
             DBoW3::EntryId id = kfDB->add(frame->bowVec, frame->featVec);
             maxKFId = id;
             checkedKFs[id] = frame;
+            // 也当做闭环
             candidateKF = checkedKFs[r.Id];
             LOG(INFO) << "add loop candidate from " << candidateKF->kfId << ", current: " << frame->kfId << ", score: "
                       << r.Score << endl;
@@ -141,7 +158,9 @@ namespace ldso {
                   << r.Score << endl;
         return true;   // don't add into database
     }
-
+    /**
+     * @brief 计算闭环帧和当前帧之间的相对位姿
+     ***/
     bool LoopClosing::CorrectLoop(shared_ptr<CalibHessian> Hcalib) {
 
         // We compute first ORB matches for each candidate
@@ -156,6 +175,7 @@ namespace ldso {
         K.at<float>(0, 2) = Hcalib->cxl();
         K.at<float>(1, 2) = Hcalib->cyl();
 
+        // [步骤1]: 通过词袋向量搜索匹配点, 构造3d点和2d点对应
         shared_ptr<Frame> pKF = candidateKF;
         vector<Match> matches;
         int nmatches = matcher.SearchByBoW(currentKF, pKF, matches);
@@ -165,6 +185,7 @@ namespace ldso {
         } else {
             LOG(INFO) << "matches: " << nmatches << endl;
 
+            // 得到闭环关键帧的3D点, 和当前帧的2D点
             // now we have a candidate proposed by dbow, let's try opencv's solve pnp ransac to see if there are enough inliers
             vector<cv::Point3f> p3d;
             vector<cv::Point2f> p2d;
@@ -199,6 +220,7 @@ namespace ldso {
                 return false;
             }
 
+            // [步骤2]: PnP求解得到当前帧的估计Sim3, 得到内点匹配对
             cv::Mat R, t;
             cv::solvePnPRansac(p3d, p2d, K, cv::Mat(), R, t, false, 100, 8.0, 0, inliers);
             int cntInliers = 0;
@@ -226,12 +248,16 @@ namespace ldso {
             ScrEsti.setScale(1.0);
 
             Mat77 Hessian;
-
+            
+            // [步骤3]: 优化估计的Tcr位姿
             if (ComputeOptimizedPose(pKF, ScrEsti, Hcalib, Hessian) == false) {
                 return false;
             }
 
             // setup pose graph
+            // [步骤4]: 把计算的结果加入相对位姿构成约束
+            // 相当于DSO的优化是提供了一个相对位姿的约束
+            // TODO 优化的位姿初始值不是DSO的优化结果, 两个绝对位姿实际上是分开了, 可改进
             {
                 Sim3 SCurRef = ScrEsti;
                 unique_lock<mutex> lock(currentKF->mutexPoseRel);
@@ -253,7 +279,16 @@ namespace ldso {
         nCandidates++;
         return success;
     }
-
+    /**
+     * @brief 对当前帧和闭环候选帧之间位姿进行优化
+     * 
+     * @param pKF           候选闭环帧
+     * @param Scr           当前帧和候选帧间的Sim3估计值
+     * @param Hcalib        相机参数
+     * @param H             返回闭环帧和当前帧的Hessian矩阵
+     * @param windowSize    网格大小
+     * 
+     ***/
     bool LoopClosing::ComputeOptimizedPose(shared_ptr<Frame> pKF, Sim3 &Scr, shared_ptr<CalibHessian> Hcalib,
                                            Mat77 &H, float windowSize) {
 
@@ -267,6 +302,7 @@ namespace ldso {
         // NOTE these residuals are not locked!
         // tcw unused?
         //SE3 Tcw = currentKF->getPose();
+        // [步骤1]: 将滑窗内关键帧上的点投影到当前帧, 得到逆深度图
         for (shared_ptr<Frame> fh: activeFrames) {
             if (fh == currentKF) continue;
             for (shared_ptr<Feature> feat: fh->features) {
@@ -289,6 +325,7 @@ namespace ldso {
         }
 
         // dilate idepth by 1.
+        //bug 这个activePixels是空的???
         for (auto &px: activePixels) {
             int idx = int(px[1] * wG[0] + px[0]);
             float idep = idepthMap[idx];
@@ -303,6 +340,7 @@ namespace ldso {
             idepthMap[idx + 1 + wG[0]] = idep;
         }
 
+        // [步骤2]: 使用网格进行Bow匹配, 得到匹配点对
         // optimize the current Tcw
         currentKF->SetFeatureGrid();
 
@@ -312,6 +350,7 @@ namespace ldso {
         VecVec2 matchedPixels;
 
         // find more matches in the local map of pKF
+        // 设置闭环候选帧上的点为候选点(candidateFeatures)
         vector<shared_ptr<Feature>> candidateFeatures;
 
         for (auto &feat: pKF->features) {
@@ -327,12 +366,14 @@ namespace ldso {
 
         // search by projection
         for (auto &p: candidateFeatures) {
-
+            
+            // 候选特征点投影到相机坐标
             Vec3 pRef = (1.0 / p->invD) * Vec3(
                     Hcalib->fxli() * (p->uv[0] - Hcalib->cxl()),
                     Hcalib->fyli() * (p->uv[1] - Hcalib->cyl()),
                     1
             );
+            // 变换到当前帧坐标系, 并投影
             Vec3 pc = Scr * pRef;
 
             float x = pc[0] / pc[2];
@@ -348,6 +389,7 @@ namespace ldso {
             auto indices = currentKF->GetFeatureInGrid(u, v, windowSize);
             float idepth = 0;
 
+            // 在投影点附近找匹配的点
             for (size_t &k: indices) {
                 shared_ptr<Feature> &feat = currentKF->features[k];
                 if (fabsf(feat->angle - p->angle) < 0.2) {
@@ -365,7 +407,7 @@ namespace ldso {
                     }
 
                     if (dist < bestDist) {
-                        bestDist2 = bestDist;
+                        bestDist2 = bestDist; // 次优值
                         bestDist = dist;
                         bestIdx = k;
                     } else if (dist < bestDist2) {
@@ -386,7 +428,7 @@ namespace ldso {
 
                 matchedPixels.push_back(Vec2(bestFeat->uv[0], bestFeat->uv[1]));
 
-                nmatches++;
+                nmatches++; // 计数君
             }
         }
 
@@ -395,6 +437,7 @@ namespace ldso {
             return false;
         }
 
+        // [步骤3]: 利用匹配点3D误差\重投影误差进行优化, 得到位姿和Hessian
         // pose optimization, note there maybe some mismatches
         // NOTE seems like there are multiple solutions if just use 3d-3d point pairs
         // setup g2o and solve the problem
@@ -416,12 +459,13 @@ namespace ldso {
         float sigma = 1.0;
         float sigma2 = sigma * sigma;
         float infor = 1.0 / sigma2;
-        float th = 5.991 * infor;
+        float th = 5.991 * infor; // 自由度2
 
         vector<EdgePointSim3 *> edgesSim3;
         vector<EdgeProjectPoseOnlySim3 *> edgesProjection;
         for (size_t i = 0; i < matchedFeatures.size(); i++) {
 
+            // 当前系下, 3D点之间的残差
             // EdgeProjectPoseOnlySim3 *eProj = new EdgeProjectPoseOnlySim3(Hcalib->mpCam, matchedPoints[i]);
             EdgePointSim3 *e3d = new EdgePointSim3(matchedPoints[i]);
             e3d->setId(i);
@@ -437,6 +481,7 @@ namespace ldso {
             e3d->setRobustKernel(rk);
             optimizer.addEdge(e3d);
 
+            // 当前图像上的重投影误差
             EdgeProjectPoseOnlySim3 *eProj = new EdgeProjectPoseOnlySim3(Hcalib->camera, matchedPoints[i]);
             eProj->setVertex(0, vSim3);
             eProj->setInformation(Mat22::Identity());
@@ -446,13 +491,14 @@ namespace ldso {
         }
 
         LOG(INFO) << "Start optimization";
-        optimizer.initializeOptimization(0);
+        optimizer.initializeOptimization(0); // 初始化为0level
         optimizer.optimize(10);
 
+        // 去除外点
         int inliers = 0, outliers = 0;
         for (auto &e : edgesSim3) {
             if (e->chi2() > th || e->chi2() < 1e-9 /* maybe some bug in g2o */ ) {
-                e->setLevel(1);
+                e->setLevel(1);  // 误差大的不包括在内
                 outliers++;
             } else {
                 e->setRobustKernel(nullptr);
@@ -474,6 +520,7 @@ namespace ldso {
         if (ScrOpti.scale() == Scr.scale() || std::isnan(ScrOpti.scale()) || ScrOpti.scale() < 0)  // optimization failed
             return false;
 
+        // 返回优化后的位姿, 和优化后的Hessian矩阵
         Scr = ScrOpti;
         Eigen::Map<Mat77> hessianData(vSim3->hessianData());
         H = hessianData;

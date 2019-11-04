@@ -470,6 +470,7 @@ namespace ldso {
 
         // =========================== OPTIMIZE ALL =========================
         fh->frameEnergyTH = frames.back()->frameHessian->frameEnergyTH;
+        
         LOG(INFO) << "call optimize on kf " << frame->kfId << endl;
         float rmse = optimize(setting_maxOptIterations);
         LOG(INFO) << "optimize is done!" << endl;
