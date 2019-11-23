@@ -222,7 +222,7 @@ namespace ldso {
 
             // [步骤2]: PnP求解得到当前帧的估计Sim3, 得到内点匹配对
             cv::Mat R, t;
-            cv::solvePnPRansac(p3d, p2d, K, cv::Mat(), R, t, false, 100, 8.0, 0, inliers);
+            cv::solvePnPRansac(p3d, p2d, K, cv::Mat(), R, t, false, 100, 8.0, 0.99, inliers);
             int cntInliers = 0;
 
             vector<Match> inlierMatches;

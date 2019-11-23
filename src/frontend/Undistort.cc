@@ -90,7 +90,7 @@ namespace ldso {
                     return;
                 }
             }
-
+            // 响应函数映射到0-255
             float min = G[0];
             float max = G[GDepth - 1];
             for (int i = 0; i < GDepth; i++)
@@ -101,7 +101,7 @@ namespace ldso {
             for (int i = 0; i < GDepth; i++) G[i] = 255.0f * i / (float) (GDepth - 1);
         }
 
-
+        // 辐射衰减
         printf("Reading Vignette Image from %s\n", vignetteImage.c_str());
         MinimalImage<unsigned short> *vm16 = IOWrap::readImageBW_16U(vignetteImage.c_str());
         MinimalImageB *vm8 = IOWrap::readImageBW_8U(vignetteImage.c_str());
@@ -163,7 +163,9 @@ namespace ldso {
         delete output;
     }
 
-
+    /**
+     * @brief 处理过曝光, 欠曝光, 加上响应函数 (没用)
+     ***/
     void PhotometricUndistorter::unMapFloatImage(float *image) {
         int wh = w * h;
         for (int i = 0; i < wh; i++) {
@@ -186,6 +188,9 @@ namespace ldso {
         }
     }
 
+    /**
+     * @brief 光度处理
+     ***/    
     template<typename T>
     void PhotometricUndistorter::processFrame(T *image_in, float exposure_time, float factor) {
         int wh = w * h;
@@ -353,7 +358,10 @@ namespace ldso {
         photometricUndist = new PhotometricUndistorter(file, noiseImage, vignetteImage, getOriginalSize()[0],
                                                        getOriginalSize()[1]);
     }
-
+    
+    /**
+     * @brief 对图像进行去畸变操作
+     ***/
     template<typename T>
     ImageAndExposure *
     Undistort::undistort(const MinimalImage<T> *image_raw, float exposure, double timestamp, float factor) const {
@@ -367,6 +375,7 @@ namespace ldso {
         ImageAndExposure *result = new ImageAndExposure(w, h, timestamp);
         photometricUndist->output->copyMetaTo(*result);
 
+        // 如果对图像进行矫正则 passthrough=false
         if (!passthrough) {
             float *out_data = result->image;
             float *in_data = photometricUndist->output->image;
@@ -389,7 +398,7 @@ namespace ldso {
 
             for (int idx = w * h - 1; idx >= 0; idx--) {
                 // get interp. values
-                float xx = remapX[idx];
+                float xx = remapX[idx]; // 把正常的映射到有畸变的图像
                 float yy = remapY[idx];
 
                 if (benchmark_varNoise > 0) {
@@ -561,7 +570,7 @@ namespace ldso {
         float maxX = 0;
         float minY = 0;
         float maxY = 0;
-
+        // -5 ~ 5 之间10000个数
         for (int x = 0; x < 100000; x++) {
             tgX[x] = (x - 50000.0f) / 10000.0f;
             tgY[x] = 0;
@@ -569,8 +578,8 @@ namespace ldso {
         distortCoordinates(tgX, tgY, tgX, tgY, 100000);
         for (int x = 0; x < 100000; x++) {
             if (tgX[x] > 0 && tgX[x] < wOrg - 1) {
-                if (minX == 0) minX = (x - 50000.0f) / 10000.0f;
-                maxX = (x - 50000.0f) / 10000.0f;
+                if (minX == 0) minX = (x - 50000.0f) / 10000.0f;  // 第一个
+                maxX = (x - 50000.0f) / 10000.0f;  // 最后一个
             }
         }
         for (int y = 0; y < 100000; y++) {
@@ -587,6 +596,7 @@ namespace ldso {
         delete[] tgX;
         delete[] tgY;
 
+        // 在畸变图像上的范围
         minX *= 1.01;
         maxX *= 1.01;
         minY *= 1.01;
@@ -603,11 +613,14 @@ namespace ldso {
         int iteration = 0;
         while (oobLeft || oobRight || oobTop || oobBottom) {
             oobLeft = oobRight = oobTop = oobBottom = false;
+            //! X最大和最小, 与Y的每一个值组合
             for (int y = 0; y < h; y++) {
                 remapX[y * 2] = minX;
                 remapX[y * 2 + 1] = maxX;
+                // Y的范围
                 remapY[y * 2] = remapY[y * 2 + 1] = minY + (maxY - minY) * (float) y / ((float) h - 1.0f);
             }
+
             distortCoordinates(remapX, remapY, remapX, remapY, 2 * h);
             for (int y = 0; y < h; y++) {
                 if (!(remapX[2 * y] > 0 && remapX[2 * y] < wOrg - 1))
@@ -616,7 +629,7 @@ namespace ldso {
                     oobRight = true;
             }
 
-
+            //! Y最大和最小, 与X的每一个值组合
             for (int x = 0; x < w; x++) {
                 remapY[x * 2] = minY;
                 remapY[x * 2 + 1] = maxY;
@@ -632,7 +645,7 @@ namespace ldso {
                     oobBottom = true;
             }
 
-
+            // 如果上下左右都不行, 就先一个方向
             if ((oobLeft || oobRight) && (oobTop || oobBottom)) {
                 if ((maxX - minX) > (maxY - minY))
                     oobBottom = oobTop = false;    // only shrink left/right
@@ -654,10 +667,14 @@ namespace ldso {
                 exit(1);
             }
         }
-
+        
+        //! u = fx*X + cx  ===> fx = width / (maxX - minX)        
         K(0, 0) = ((float) w - 1.0f) / (maxX - minX);
+        //! v = fy*Y + cy  ===> fy = height / (maxY - minY)
         K(1, 1) = ((float) h - 1.0f) / (maxY - minY);
+        //! 0 = fx*minX + cx ===> cx = -fx*minX        
         K(0, 2) = -minX * K(0, 0);
+        //! 0 = fy*minY + cy ===> cy = -fy*minY
         K(1, 2) = -minY * K(1, 1);
 
     }
@@ -837,6 +854,7 @@ namespace ldso {
                 remapY[x + y * w] = y;
             }
 
+        // 对整张图像去畸变
         distortCoordinates(remapX, remapY, remapX, remapY, h * w);
 
 
