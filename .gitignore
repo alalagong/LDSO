@@ -20,3 +20,6 @@ evaluation/matlab-evaluation/**/*.mat
 
 # python
 **.pyc
+
+# vscode
+.vscode

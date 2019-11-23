@@ -4,6 +4,9 @@
         "cmath": "cpp",
         "functional": "cpp",
         "iosfwd": "cpp",
-        "type_traits": "cpp"
+        "type_traits": "cpp",
+        "thread": "cpp",
+        "typeindex": "cpp",
+        "typeinfo": "cpp"
     }
 }

@@ -97,8 +97,10 @@ namespace ldso {
         float my_minRelBS = 0;
         bool needRefresh = true;
 
+        // 地图点个数
         int numSparsePoints = 0;
         int numSparseBufferSize = 0;
+        // DSO生成的地图点相关数据
         InputPointSparse<MAX_RES_PER_POINT> *originalInputSparse;
 
         bool bufferValid = 0;
