@@ -189,7 +189,7 @@ namespace ldso {
     template<typename T>
     void PhotometricUndistorter::processFrame(T *image_in, float exposure_time, float factor) {
         int wh = w * h;
-        //TODO 在这里变成float
+     
         float *data = output->image;
         assert(output->w == w && output->h == h);
         assert(data != 0);
