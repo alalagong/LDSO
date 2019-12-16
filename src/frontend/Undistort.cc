@@ -189,6 +189,7 @@ namespace ldso {
     template<typename T>
     void PhotometricUndistorter::processFrame(T *image_in, float exposure_time, float factor) {
         int wh = w * h;
+        //TODO 在这里变成float
         float *data = output->image;
         assert(output->w == w && output->h == h);
         assert(data != 0);
@@ -362,7 +363,7 @@ namespace ldso {
                    h);
             exit(1);
         }
-
+        //! 这里是原图像大小
         photometricUndist->processFrame<T>(image_raw->data, exposure, factor);
         ImageAndExposure *result = new ImageAndExposure(w, h, timestamp);
         photometricUndist->output->copyMetaTo(*result);
