@@ -135,6 +135,11 @@ namespace ldso {
         vector<shared_ptr<Feature>> features;  // Features contained
         vector<vector<std::size_t>> grid;      // feature grid, to fast access features in a given area
         const int gridSize = 20;                // grid size
+        
+        bool is_Kf = false;             // is or not keyframe
+        shared_ptr<Frame> ref_frame;    // for ordinary frame, reference frame
+        SE3 Tcr;                        // pose from reference to ordinary frame
+        vector<shared_ptr<Feature>> features_ref; // visiable feature of reference on current
 
         // pose relative to keyframes in the window, stored as T_cur_ref
         // this will be changed by full system and loop closing, so we need a mutex

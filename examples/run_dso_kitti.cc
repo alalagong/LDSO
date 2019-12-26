@@ -442,7 +442,20 @@ int main(int argc, char **argv) {
 
     runthread.join();
 
+    std::size_t found = source.find_last_of("t");
+    std::cout<< source <<std::endl;
 
+    std::string path_save = source.substr(0, found+1);
+    std::cout<< path_save <<std::endl;
+
+    std::string num_of_seq = source.substr(found+11);
+    std::cout<< num_of_seq <<std::endl;
+
+    LOG(INFO) << "The path to save is "<< path_save + "/pointcould" + num_of_seq;
+    // viewer->saveAsPLYFile("~/pointcloud_kitti.ply");
+    viewer->savePointCouldPerFrame(path_save + "/pointcould" + num_of_seq);
+
+    viewer->saveAsPLYFile("./pointcloud.ply");
     LOG(INFO) << "EXIT NOW!";
     return 0;
 }

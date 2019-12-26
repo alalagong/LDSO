@@ -1,6 +1,7 @@
 #include <thread>
 #include <pangolin/pangolin.h>
 #include <sys/time.h>
+#include <iomanip>
 
 #include "Feature.h"
 #include "frontend/DSOViewer.h"
@@ -751,4 +752,317 @@ namespace ldso {
         cout << "ply file is save to " << file_name << endl;
     }
 
-}
+    
+    void PangolinDSOViewer::publishFrameSave(std::vector<shared_ptr<Frame>> &frames, shared_ptr<CalibHessian> HCalib)
+    {
+        for(auto fr : frames)
+        {
+            // add new
+           publishFrameSave(fr, HCalib);
+        }
+    }
+
+    void PangolinDSOViewer::publishFrameSave(shared_ptr<Frame> frame, shared_ptr<CalibHessian> HCalib)
+    {
+        if(framesSaveByID.find(frame->id) == framesSaveByID.end())
+        {
+            shared_ptr<FrameSave> fs = shared_ptr<FrameSave>(new FrameSave());
+            framesSaveByID[frame->id] = fs;
+        }
+
+        if(frame->is_Kf)
+            framesSaveByID[frame->id]->setFromKF(frame, HCalib);        
+        else
+            framesSaveByID[frame->id]->setFromF(frame, HCalib);
+    }
+
+
+    void FrameSave::setFromKF(shared_ptr<Frame> frame, shared_ptr<CalibHessian> HCalib)
+    {
+        LOG_ASSERT(frame->is_Kf) << "The frame isn't Key frame! "; 
+
+        fx = HCalib->fxl();
+        fy = HCalib->fyl();
+        cx = HCalib->cxl();
+        cy = HCalib->cyl();
+        width = wG[0];
+        height = hG[0];
+        fxi = 1 / fx;
+        fyi = 1 / fy;
+        cxi = -cx / fx;
+        cyi = -cy / fy;
+
+        Swc = frame->getPoseOpti().inverse();        
+        ref_id = frame->id;
+        id = ref_id;
+        is_kf = frame->is_Kf;
+        originFrame = frame;
+
+        // marg 掉了
+        if(!frame->frameHessian)
+        {
+            return;
+        }
+
+        if(points.size())
+            points.clear();
+        
+        for(auto feat : frame->features)
+        {
+            // LOG_ASSERT(feat->point && feat->point->mpPH);
+            if(feat->point && feat->point->mpPH)
+            {
+                auto ph = feat->point->mpPH;
+                points.emplace_back(ph->u, ph->v, ph->idepth);
+            }
+            
+        }
+
+    }
+
+    void FrameSave::setFromF(shared_ptr<Frame> frame, shared_ptr<CalibHessian> HCalib)
+    {
+        LOG_ASSERT(!frame->is_Kf) << "The frame isn't ordinary frame! ";
+
+        fx = HCalib->fxl();
+        fy = HCalib->fyl();
+        cx = HCalib->cxl();
+        cy = HCalib->cyl();
+        width = wG[0];
+        height = hG[0];
+        fxi = 1 / fx;
+        fyi = 1 / fy;
+        cxi = -cx / fx;
+        cyi = -cy / fy;
+
+        originFrame = frame;
+        ref_id = frame->ref_frame->id;
+        id = frame->id;
+        is_kf = frame->is_Kf;
+        Tcr = frame->Tcr;
+    }
+
+    void PangolinDSOViewer::savePointCouldPerFrame(std::string path)
+    {
+        SE3 Twc;     // 位姿
+
+        for(auto iter_save : framesSaveByID)
+        {
+            int id = iter_save.first;
+            shared_ptr<FrameSave> frame_save = iter_save.second;
+            LOG_ASSERT(id == frame_save->id) << "ID of frame is error";
+            
+            float fx = frame_save->fx;
+            float fy = frame_save->fy;
+            float cx = frame_save->cx;
+            float cy = frame_save->cy;
+            float fxi = frame_save->fxi;
+            float fyi = frame_save->fyi;
+            float cxi = frame_save->cxi;
+            float cyi = frame_save->cyi;
+            float w = frame_save->width;
+            float h = frame_save->height;
+            
+            if(frame_save->is_kf)
+            {
+                // pose
+                if(frame_save->originFrame)
+                {
+                    Sim3 Swc = frame_save->originFrame->getPoseOpti().inverse();
+                    Twc = SE3(Swc.rotationMatrix(), Swc.translation());
+                }
+                else
+                    Twc = SE3(frame_save->Swc.rotationMatrix(), frame_save->Swc.translation());
+
+                std::stringstream name;
+                name << std::setfill('0') << std::setw(6) << id;
+                std::ofstream fs_pose(path + name.str() + ".txt");
+                fs_pose << setprecision(10);
+
+                fs_pose << Twc.translation().transpose() << " "
+                        << Twc.so3().unit_quaternion().x() << " "
+                        << Twc.so3().unit_quaternion().y() << " "
+                        << Twc.so3().unit_quaternion().z() << " "
+                        << Twc.so3().unit_quaternion().w();
+
+                fs_pose.close();
+
+                // TODO 点太少了，第一帧2000，后面是补齐的只有400多！！！
+                // point as plyfile
+                int cnt_points = 0;
+                int kf_count = 1;
+                std::vector<Eigen::Vector3d> map_points;
+
+                // 遍历往前6帧
+                for(int i = id; i >= 0; --i)
+                {
+                    auto frame_save_sw = framesSaveByID.find(i);  
+                    
+                    if(frame_save_sw == framesSaveByID.end())
+                        continue;
+
+
+                    
+                    // 滑窗内的关键帧
+                    if(frame_save_sw->second->is_kf)
+                    {
+                        ++kf_count;
+
+                        // 相对位姿
+                        SE3 Twc_sw = SE3(frame_save_sw->second->Swc.rotationMatrix(), frame_save_sw->second->Swc.translation());
+                        SE3 Tcr = Twc.inverse()*Twc_sw;
+
+                        // 其它帧上点变到当前帧
+                        //TODO 用mappoint更好
+                        auto p = frame_save_sw->second->points;        
+
+                        for(int j = 0; j < p.size(); ++j)
+                        {
+                            float x = 0, y = 0, z = 0;
+
+                            z = 1.0/p[j].z();
+                            x = (fxi * p[j].x() + cxi) * z;
+                            y = (fyi * p[j].y() + cyi) * z;
+                            
+
+                            Eigen::Vector3d p_r(x, y, z);
+                            Eigen::Vector3d p_c = Tcr * p_r;
+
+                            float u = 0, v = 0;
+                            u = fx * p_c[0]/p_c[2] + cx;
+                            v = fy * p_c[1]/p_c[2] + cy;
+
+                            if(u > 0 && u < w && v > 0 && v < h)
+                            {
+                                map_points.push_back(p_c);
+                                cnt_points++;
+                            }
+                        }
+
+                        // if(kf_count > 6)
+                        //     break;
+
+                        if(map_points.size() > 2000)
+                            break;
+                    }
+                }
+
+                if(cnt_points > 0)
+                {
+                    LOG(INFO) << "Frame " << id << " has " << cnt_points << " map points !!";
+                    frame_save->map_points = map_points;
+                }
+                else
+                {
+                    LOG(WARNING) << "NO exist map points in Frame " << id;
+                }
+                
+                std::ofstream fs_point(path + name.str() + ".ply");
+
+                fs_point << "ply" << endl << "format ascii 1.0" << endl
+                     << "element vertex " << cnt_points << endl
+                     << "property float x" << endl
+                     << "property float y" << endl
+                     << "property float z" << endl
+                     << "end_header" << endl;
+
+                for(int i = 0; i < cnt_points; ++i)
+                {
+                    float x = map_points[i][0];
+                    float y = map_points[i][1];
+                    float z = map_points[i][2];
+
+                    fs_point << x << " " << y << " " << z <<endl;
+                }
+
+                fs_point.close();
+
+            }
+            else
+            {
+                int ref_id = frame_save->ref_id;
+                shared_ptr<FrameSave> frame_save_ref = framesSaveByID[ref_id];
+                SE3 Tcr = frame_save->Tcr;
+
+                // pose
+                SE3 Twc_ref;
+                if(frame_save_ref->originFrame)
+                {
+                    Sim3 Swc = frame_save_ref->originFrame->getPoseOpti().inverse();
+                    Twc_ref = SE3(Swc.rotationMatrix(), Swc.translation());
+                }
+                else
+                    Twc_ref = SE3(frame_save_ref->Swc.rotationMatrix(), frame_save_ref->Swc.translation());
+                
+                Twc = Twc_ref * Tcr.inverse();
+
+                std::stringstream name;
+                name << std::setfill('0') << std::setw(6) << id;
+                std::ofstream fs_pose(path + name.str() + ".txt");
+                fs_pose << setprecision(10);
+
+                fs_pose << Twc.translation().x() << " "
+                        << Twc.translation().y() << " "
+                        << Twc.translation().z() << " "
+                        << Twc.so3().unit_quaternion().x() << " "
+                        << Twc.so3().unit_quaternion().y() << " "
+                        << Twc.so3().unit_quaternion().z() << " "
+                        << Twc.so3().unit_quaternion().w();
+
+                fs_pose.close();
+
+                // point
+                std::vector<Eigen::Vector3d> point_vis;  // 可见点
+                int cnt_points = frame_save_ref->map_points.size();
+
+                for(int i = 0; i < cnt_points; ++i)
+                {
+
+                    float x_ref = frame_save_ref->map_points[i][0];
+                    float y_ref = frame_save_ref->map_points[i][1];
+                    float z_ref = frame_save_ref->map_points[i][2];
+
+                    // float x, y, z, u, v;
+                    // x = (fxi * u_ref + cxi) * depth_ref;
+                    // y = (fyi * v_ref + cyi) * depth_ref;
+                    // z = depth_ref;
+
+                    float u = 0, v = 0;
+                    Eigen::Vector3d p_ref(x_ref, y_ref, z_ref);
+                    Eigen::Vector3d p = Tcr * p_ref;
+
+                    u = fx * p.x()/p.z() + cx;
+                    v = fy * p.y()/p.z() + cy;
+
+                    if(u > 0 && u < w && v > 0 && v < h)
+                    {
+                        point_vis.push_back(p);
+                    }
+                }
+
+                cnt_points = point_vis.size();
+                std::ofstream fs_point(path + name.str() + ".ply");
+
+                fs_point << "ply" << endl << "format ascii 1.0" << endl
+                     << "element vertex " << cnt_points << endl
+                     << "property float x" << endl
+                     << "property float y" << endl
+                     << "property float z" << endl
+                     << "end_header" << endl;
+
+                for(int i = 0; i < cnt_points; ++i)
+                {
+                    float x, y, z;
+                    x = point_vis[i].x();
+                    y = point_vis[i].y();
+                    z = point_vis[i].z();
+
+                    fs_point << x << " " << y << " " << z <<endl;
+                }
+
+                fs_point.close();
+
+            }
+        }
+    }
+} // end namespace ldso

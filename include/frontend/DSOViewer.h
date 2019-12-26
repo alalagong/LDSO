@@ -37,6 +37,41 @@ namespace ldso {
         unsigned char status = 0;
     };
 
+    //! add to save frame
+    class FrameSave
+    {
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    
+        void setFromKF(shared_ptr<Frame> fh, shared_ptr<CalibHessian> HCalib);
+        void setFromF(shared_ptr<Frame> fh, shared_ptr<CalibHessian> HCalib);
+
+        void save(std::string);
+
+        int id = 0;
+        bool is_kf = false;
+
+        // keyframe
+        vector<Eigen::Vector3d> points;     // u, v, idepth
+        vector<Eigen::Vector3d> map_points; // 当前帧可见所有地图点
+        Sim3 Swc;
+        shared_ptr<Frame> originFrame = nullptr;
+
+        // frame
+        SE3 Tcr;
+        int ref_id;             // keyframe is itself
+
+        inline bool operator<(const FrameSave &other) const {
+        return (id < other.id);
+        }
+    
+        float fx, fy, cx, cy;
+        float fxi, fyi, cxi, cyi;
+        double scale = 1.0;
+        int width, height;
+    };
+
+
     // stores a point cloud associated to a Keyframe.
     class KeyFrameDisplay {
 
@@ -130,6 +165,12 @@ namespace ldso {
 
         void publishCamPose(shared_ptr<Frame> frame, shared_ptr<CalibHessian> HCalib);
 
+        void publishFrameSave(shared_ptr<Frame> frame, shared_ptr<CalibHessian> HCalib);
+
+        void publishFrameSave(std::vector<shared_ptr<Frame>> &frames, shared_ptr<CalibHessian> HCalib);
+
+        void savePointCouldPerFrame(std::string path);
+
         void setMap(shared_ptr<Map> m) {
             globalMap = m;
         }
@@ -175,6 +216,8 @@ namespace ldso {
         std::vector<shared_ptr<KeyFrameDisplay>> keyframes; // all keyframes
         std::map<int, shared_ptr<KeyFrameDisplay>> keyframesByKFID;
         std::vector<size_t> activeKFIDs;    // active keyframes's IDs
+
+        std::map<int, shared_ptr<FrameSave>> framesSaveByID;
 
         // render settings
         bool settings_showKFCameras = true;

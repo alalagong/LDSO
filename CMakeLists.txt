@@ -39,7 +39,7 @@ find_package(Pangolin REQUIRED)
 # optional libs
 find_package(LibZip QUIET)
 
-set(CMAKE_CXX_FLAGS "-Wall -Wno-deprecated -march=native -Wno-duplicate-decl-specifier -Wno-ignored-qualifiers -Wno-reorder -Wno-missing-braces")
+set(CMAKE_CXX_FLAGS "-Wall -g -Wno-deprecated -march=native -Wno-duplicate-decl-specifier -Wno-ignored-qualifiers -Wno-reorder -Wno-missing-braces")
 
 if(NOT APPLE)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")

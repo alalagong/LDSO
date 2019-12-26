@@ -145,9 +145,16 @@ namespace ldso {
 
                 needToMakeKF = allFrameHistory.size() == 1 || b1 || b2;
             }
+            
+            //! add by gong
+            fh->frame->ref_frame = coarseTracker->lastRef->frame;
 
             if (viewer)
                 viewer->publishCamPose(fh->frame, Hcalib->mpCH);
+            
+            // 非关键帧
+            if(!needToMakeKF && viewer)
+                viewer->publishFrameSave(fh->frame, Hcalib->mpCH);
 
             lock.unlock();
             LOG(INFO) << "deliver frame " << fh->frame->id << endl;
@@ -158,6 +165,10 @@ namespace ldso {
     }
 
     void FullSystem::deliverTrackedFrame(shared_ptr<FrameHessian> fh, bool needKF) {
+        
+        //! add by gong
+        fh->frame->is_Kf = needKF;
+        
         if (linearizeOperation) {
             if (needKF) {
                 makeKeyFrame(fh);
@@ -371,6 +382,24 @@ namespace ldso {
         SE3 camToWorld = lastF->frame->getPose().inverse() * lastF_2_fh.inverse();
         fh->frame->setPose(camToWorld.inverse());
         fh->frame->aff_g2l = aff_g2l;
+        
+        //! add by gong to save frame
+        fh->frame->Tcr = lastF_2_fh;
+        // for(auto feat : lastF->frame->features)
+        // {
+        //     if (feat->point && feat->point->mpPH)
+        //     {
+        //         auto p = feat->point->mpPH;
+        //         float u = p->u;
+        //         float v = p->v;
+        //         float d = 1.0/p->idepth_scaled;  //! 后面可能会更新, 无所谓, 只用来判断
+        //         float fx = coarseTracker->fx;
+        //         float fy = coarseTracker->fy;
+        //         // Eigen::Vector3d point;
+
+        //     }
+        // }
+        fh->frame->features_ref = lastF->frame->features;
 
         if (coarseTracker->firstCoarseRMSE < 0)
             coarseTracker->firstCoarseRMSE = achievedRes[0];
@@ -565,7 +594,10 @@ namespace ldso {
 
         // visualization
         if (viewer)
+        {
             viewer->publishKeyframes(frames, false, Hcalib->mpCH);
+            viewer->publishFrameSave(frames, Hcalib->mpCH);
+        }
 
         // =========================== Marginalize Frames =========================
         {
@@ -1323,6 +1355,7 @@ namespace ldso {
         shared_ptr<FrameHessian> firstFrame = coarseInitializer->firstFrame;
         shared_ptr<Frame> fr = firstFrame->frame;
         firstFrame->idx = frames.size();
+        fr->is_Kf = true;
 
         frames.push_back(fr);
         firstFrame->frameID = globalMap->NumFrames();

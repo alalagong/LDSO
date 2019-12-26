@@ -22,4 +22,10 @@ evaluation/matlab-evaluation/**/*.mat
 **.pyc
 
 # vscode
-.vscode
+.vscode/
+*.json
+data/results.txt
+data/results.txt.noloop
+CMakeFiles/cmake.check_cache
+.vscode/settings.json
+CMakeCache.txt
