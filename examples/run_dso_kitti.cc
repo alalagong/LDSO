@@ -455,7 +455,7 @@ int main(int argc, char **argv) {
     // viewer->saveAsPLYFile("~/pointcloud_kitti.ply");
     viewer->savePointCouldPerFrame(path_save + "/pointcould" + num_of_seq);
 
-    viewer->saveAsPLYFile("./pointcloud.ply");
+    // viewer->saveAsPLYFile("./pointcloud.ply");
     LOG(INFO) << "EXIT NOW!";
     return 0;
 }

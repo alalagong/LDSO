@@ -385,21 +385,7 @@ namespace ldso {
         
         //! add by gong to save frame
         fh->frame->Tcr = lastF_2_fh;
-        // for(auto feat : lastF->frame->features)
-        // {
-        //     if (feat->point && feat->point->mpPH)
-        //     {
-        //         auto p = feat->point->mpPH;
-        //         float u = p->u;
-        //         float v = p->v;
-        //         float d = 1.0/p->idepth_scaled;  //! 后面可能会更新, 无所谓, 只用来判断
-        //         float fx = coarseTracker->fx;
-        //         float fy = coarseTracker->fy;
-        //         // Eigen::Vector3d point;
-
-        //     }
-        // }
-        fh->frame->features_ref = lastF->frame->features;
+        // fh->frame->features_ref = lastF->frame->features;
 
         if (coarseTracker->firstCoarseRMSE < 0)
             coarseTracker->firstCoarseRMSE = achievedRes[0];
