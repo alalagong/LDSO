@@ -23,3 +23,5 @@ evaluation/matlab-evaluation/**/*.mat
 
 # vscode
 .vscode
+*.txt*
+CMakeFiles/cmake.check_cache
