@@ -1955,7 +1955,8 @@ namespace ldso {
                 SE3 Twc = fr->getPose().inverse();
                 Mat33 Rwc = Twc.rotationMatrix();
                 Vec3 twc = Twc.translation();
-                f << fr->id << " " << setprecision(9) <<
+                // f << fr->id << " " << setprecision(9) <<
+                f << setprecision(9) << fr->timeStamp << " " <<
                   Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
                   Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
                   Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << endl;
@@ -1963,7 +1964,8 @@ namespace ldso {
                 Sim3 Swc = fr->getPoseOpti().inverse();
                 Mat33 Rwc = Swc.rotationMatrix();
                 Vec3 twc = Swc.translation();
-                f << fr->id << " " << setprecision(9) <<
+                // f << fr->id << " " << setprecision(9) <<
+                f << setprecision(9) << fr->timeStamp << " " << 
                   Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
                   Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
                   Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << endl;

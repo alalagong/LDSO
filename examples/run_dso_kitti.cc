@@ -254,6 +254,20 @@ void parseArgument(char *arg) {
     printf("could not parse argument \"%s\"!!!!\n", arg);
 }
 
+// void getPicTimestamp(){
+// 	std::ifstream inf;
+// 	inf.open(pic_timestamp);
+// 	std::string sline;
+// 	std::getline(inf,sline);
+// 	while(std::getline(inf,sline)){
+// 		std::istringstream ss(sline);
+// 		double time;
+// 		ss>>time;
+// 		// time = time;
+// 		pic_time_stamp.push_back(time);
+// 	}
+// }
+
 int main(int argc, char **argv) {
 
     FLAGS_colorlogtostderr = true;
