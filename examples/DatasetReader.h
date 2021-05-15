@@ -204,7 +204,13 @@ public:
     // undistorter. [0] always exists, [1-2] only when MT is enabled.
     Undistort *undistort;
 private:
+    MinimalImageB *getSemanticLabel_internal(int id){
+        return IOWrap::readSemanticLabel_8U(sem_files[id]);
+    }
 
+    MinimalImageB *getSemanticBel_internal(int id){
+        return IOWrap::readSemanticBel_8U(sem_files[id]);
+    }
 
     MinimalImageB *getImageRaw_internal(int id, int unused) {
         if (!isZipped) {
@@ -242,12 +248,15 @@ private:
 
     ImageAndExposure *getImage_internal(int id, int unused) {
         MinimalImageB *minimg = getImageRaw_internal(id, 0);
+        MinimalImageB *minlable = getSemanticLabel_internal(id);
+        MinimalImageB *minbel = getSemanticBel_internal(id);
         ImageAndExposure *ret2 = undistort->undistort<unsigned
         char>(
-                minimg,
+                minimg, minlable, minbel,
                 (exposures.size() == 0 ? 1.0f : exposures[id]),
                 (timestamps.size() == 0 ? 0.0 : timestamps[id]));
         delete minimg;
+
         return ret2;
     }
 
@@ -311,9 +320,11 @@ private:
         tr.close();
 
         // get the files
-        boost::format fmt("%s/image_0/%06d.png");
+        boost::format fmt_img("%s/image_0/%06d.png");
+        boost::format fmt_yaml("%s/semantic/%06d.yaml");
         for (size_t i = 0; i < timestamps.size(); i++) {
-            files.push_back((fmt % path % i).str());
+            files.push_back((fmt_img % path % i).str());
+            sem_files.push_back((fmt_yaml % path % i).str());
         }
 
         LOG(INFO) << "Load total " << timestamps.size() << " data entries." << endl;
@@ -395,6 +406,7 @@ private:
 
     std::vector<ImageAndExposure *> preloadedImages;
     std::vector<std::string> files;
+    std::vector<std::string> sem_files;
     std::vector<double> timestamps;
     std::vector<float> exposures;
     DatasetType datasetType;

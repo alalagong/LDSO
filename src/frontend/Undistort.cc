@@ -36,6 +36,7 @@
 #include "frontend/Undistort.h"
 #include "frontend/ImageRW.h"
 
+#include <opencv2/highgui/highgui.hpp>
 using namespace ldso::internal;
 
 namespace ldso {
@@ -464,6 +465,137 @@ namespace ldso {
     template ImageAndExposure *
     Undistort::undistort<unsigned short>(const MinimalImage<unsigned short> *image_raw, float exposure,
                                          double timestamp, float factor) const;
+
+    template<typename T>
+    ImageAndExposure *
+    Undistort::undistort(const MinimalImage<T> *image_raw, const MinimalImageB *label, const MinimalImageB *bel,
+                            float exposure, double timestamp, float factor) const {
+        if (image_raw->w != wOrg || image_raw->h != hOrg) {
+            printf("Undistort::undistort: wrong image size (%d %d instead of %d %d) \n", image_raw->w, image_raw->h, w,
+                   h);
+            exit(1);
+        }
+        if (label->w != wOrg || label->h != hOrg ) {
+            printf("Undistort::undistort: wrong label size (%d %d instead of %d %d) \n", label->w, label->h, w,
+                   h);
+            exit(1);
+        }        
+        if (bel->w != wOrg || bel->h != hOrg) {
+            printf("Undistort::undistort: wrong believe size (%d %d instead of %d %d) \n", bel->w, bel->h, w,
+                   h);
+            exit(1);
+        }
+
+        photometricUndist->processFrame<T>(image_raw->data, exposure, factor);
+        ImageAndExposure *result = new ImageAndExposure(w, h, timestamp);
+        photometricUndist->output->copyMetaTo(*result);
+
+        // 如果对图像进行矫正则 passthrough=false
+        if (!passthrough) {
+            float *out_data = result->image;
+            unsigned char *out_label_data = result->label;
+            unsigned char *out_bel_data = result->bel;
+            
+            float *in_data = photometricUndist->output->image;
+            unsigned char *in_label_data = label->data;
+            unsigned char *in_bel_data = bel->data;
+
+            float *noiseMapX = 0;
+            float *noiseMapY = 0;
+            if (benchmark_varNoise > 0) {
+                int numnoise = (benchmark_noiseGridsize + 8) * (benchmark_noiseGridsize + 8);
+                noiseMapX = new float[numnoise];
+                noiseMapY = new float[numnoise];
+                memset(noiseMapX, 0, sizeof(float) * numnoise);
+                memset(noiseMapY, 0, sizeof(float) * numnoise);
+
+                for (int i = 0; i < numnoise; i++) {
+                    noiseMapX[i] = 2 * benchmark_varNoise * (rand() / (float) RAND_MAX - 0.5f);
+                    noiseMapY[i] = 2 * benchmark_varNoise * (rand() / (float) RAND_MAX - 0.5f);
+                }
+            }
+
+
+            for (int idx = w * h - 1; idx >= 0; idx--) {
+                // get interp. values
+                float xx = remapX[idx]; // 把正常的映射到有畸变的图像
+                float yy = remapY[idx];
+
+                if (benchmark_varNoise > 0) {
+                    float deltax = getInterpolatedElement11BiCub(noiseMapX,
+                                                                 4 + (xx / (float) wOrg) * benchmark_noiseGridsize,
+                                                                 4 + (yy / (float) hOrg) * benchmark_noiseGridsize,
+                                                                 benchmark_noiseGridsize + 8);
+                    float deltay = getInterpolatedElement11BiCub(noiseMapY,
+                                                                 4 + (xx / (float) wOrg) * benchmark_noiseGridsize,
+                                                                 4 + (yy / (float) hOrg) * benchmark_noiseGridsize,
+                                                                 benchmark_noiseGridsize + 8);
+                    float x = idx % w + deltax;
+                    float y = idx / w + deltay;
+                    if (x < 0.01) x = 0.01;
+                    if (y < 0.01) y = 0.01;
+                    if (x > w - 1.01) x = w - 1.01;
+                    if (y > h - 1.01) y = h - 1.01;
+
+                    xx = getInterpolatedElement(remapX, x, y, w);
+                    yy = getInterpolatedElement(remapY, x, y, w);
+                }
+
+
+                if (xx < 0)
+                {
+                    out_data[idx] = 0;
+                    out_label_data[idx] = 0;
+                    out_bel_data[idx] = 0;
+                }   
+                else {
+                    // get integer and rational parts
+                    int xxi = xx;
+                    int yyi = yy;
+                    int xxi_near = xx + 0.5;
+                    int yyi_near = yy + 0.5;
+                    xx -= xxi;
+                    yy -= yyi;
+                    float xxyy = xx * yy;
+
+                    // get array base pointer
+                    const float *src = in_data + xxi + yyi * wOrg;
+                    // const unsigned char *label = in_label_data + xxi + yyi * wOrg;
+                    // const unsigned char *bel = in_bel_data + xxi + yyi * wOrg;
+                    
+                    // interpolate (bilinear)
+                    out_data[idx] = xxyy * src[1 + wOrg]
+                                    + (yy - xxyy) * src[wOrg]
+                                    + (xx - xxyy) * src[1]
+                                    + (1 - xx - yy + xxyy) * src[0];
+
+                    const unsigned char *src_label = in_label_data + xxi_near + yyi_near * wOrg;
+                    const unsigned char *src_bel = in_bel_data + xxi_near + yyi_near * wOrg;
+                    // 不能插值，挑最近的
+                    out_label_data[idx] = src_label[0];
+                    out_bel_data[idx] = src_bel[0];
+                }
+            }
+
+            if (benchmark_varNoise > 0) {
+                delete[] noiseMapX;
+                delete[] noiseMapY;
+            }
+
+        } else {
+            memcpy(result->image, photometricUndist->output->image, sizeof(float) * w * h);
+        }
+
+        applyBlurNoise(result->image);
+
+        return result;        
+    }
+        
+    template ImageAndExposure *
+    Undistort::undistort<unsigned char>(const MinimalImage<unsigned char> *image_raw, const MinimalImageB *label, 
+                                        const MinimalImageB *bel, float exposure, double timestamp, float factor) const;
+
+    
 
 
     void Undistort::applyBlurNoise(float *img) const {

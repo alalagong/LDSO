@@ -82,6 +82,13 @@ namespace ldso {
         fh->ab_exposure = image->exposure_time;
         fh->makeImages(image->image, Hcalib->mpCH);
 
+        cv::Mat label(image->h, image->w, CV_8U, image->label);
+        cv::Mat bel(image->h, image->w, CV_8U, image->bel);
+
+        cv::imshow("label", label*10);
+        cv::imshow("confidence", bel);
+        cv::waitKey(10);
+
         if (!initialized) {
             LOG(INFO) << "Initializing ... " << endl;
             // use initializer
@@ -1955,20 +1962,28 @@ namespace ldso {
                 SE3 Twc = fr->getPose().inverse();
                 Mat33 Rwc = Twc.rotationMatrix();
                 Vec3 twc = Twc.translation();
+                Eigen::Quaterniond q(Rwc);
                 // f << fr->id << " " << setprecision(9) <<
-                f << setprecision(9) << fr->timeStamp << " " <<
-                  Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
-                  Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
-                  Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << endl;
+                // f << setprecision(9) << fr->timeStamp << " " <<
+                //   Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
+                //   Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
+                //   Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << endl;
+                f << fr->timeStamp << " " << setprecision(9) <<
+                    twc(0) << " " << twc(1) << " " << twc(2) << " " <<
+                    q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
             } else {
                 Sim3 Swc = fr->getPoseOpti().inverse();
                 Mat33 Rwc = Swc.rotationMatrix();
                 Vec3 twc = Swc.translation();
+                Eigen::Quaterniond q(Rwc);
                 // f << fr->id << " " << setprecision(9) <<
-                f << setprecision(9) << fr->timeStamp << " " << 
-                  Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
-                  Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
-                  Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << endl;
+                // f << setprecision(9) << fr->timeStamp << " " << 
+                //   Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
+                //   Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
+                //   Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << endl;
+                f << fr->timeStamp << " " << setprecision(9) <<
+                    twc(0) << " " << twc(1) << " " << twc(2) << " " <<
+                    q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
             }
         }
         f.close();

@@ -25,3 +25,4 @@ evaluation/matlab-evaluation/**/*.mat
 .vscode
 *.txt*
 CMakeFiles/cmake.check_cache
+.vscode/settings.json

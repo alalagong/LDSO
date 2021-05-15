@@ -35,6 +35,7 @@ if(OpenCV_VERSION VERSION_LESS 3)
 endif()
 find_package(Glog REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(YAML-CPP REQUIRED)
 
 # optional libs
 find_package(LibZip QUIET)
@@ -60,6 +61,7 @@ include_directories(
         ${OpenCV_INCLUDE_DIR}
         ${Glog_INCLUDE_DIRS}
         ${Pangolin_INCLUDE_DIRS}
+        ${YAML_CPP_INCLUDE_DIR}
 
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/thirdparty/
@@ -71,6 +73,7 @@ set( THIRD_PARTY_LIBS
         ${OpenCV_LIBS}
         ${GLOG_LIBRARY}
         ${Pangolin_LIBRARIES}
+        ${YAML_CPP_LIBRARIES}
         ${PROJECT_SOURCE_DIR}/thirdparty/g2o/lib/libg2o${CMAKE_SHARED_LIBRARY_SUFFIX}
         ${PROJECT_SOURCE_DIR}/thirdparty/DBoW3/build/src/libDBoW3${CMAKE_SHARED_LIBRARY_SUFFIX}
         ${LIBZIP_LIBRARY}

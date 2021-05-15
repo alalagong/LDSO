@@ -17,6 +17,7 @@
 #include "FeatureDetector.h"
 #include "FeatureMatcher.h"
 #include "PixelSelector2.h"
+#include "SemanticRW.h"
 
 #include "internal/IndexThreadReduce.h"
 #include "LoopClosing.h"
