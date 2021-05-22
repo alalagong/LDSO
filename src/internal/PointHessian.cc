@@ -6,7 +6,7 @@ namespace ldso {
 
     namespace internal {
         /**
-        * @brief 点收敛后, 从rawPoint构建点
+        * @brief 点收敛后, 从ImmaturePoint构建点
         ***/
         PointHessian::PointHessian(shared_ptr<ImmaturePoint> rawPoint) {
             u = rawPoint->feature->uv[0];
@@ -18,6 +18,7 @@ namespace ldso {
 
             int n = patternNum;
             memcpy(color, rawPoint->color, sizeof(float) * n);
+            memcpy(label, rawPoint->label, sizeof(float) * n);
             memcpy(weights, rawPoint->weights, sizeof(float) * n);
             energyTH = rawPoint->energyTH;
         }

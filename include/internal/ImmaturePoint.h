@@ -103,6 +103,7 @@ namespace ldso {
 
             float color[MAX_RES_PER_POINT];
             float weights[MAX_RES_PER_POINT];
+            unsigned char label[MAX_RES_PER_POINT] = {19};
 
             Mat22f gradH;
             Vec2f gradH_ev;

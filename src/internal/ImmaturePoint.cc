@@ -24,7 +24,12 @@ namespace ldso {
 
                 Vec3f ptc = getInterpolatedElement33BiLin(host->dI, u + dx, v + dy, wG[0]);
 
+                int u_near = u + dx + 0.5;
+                int v_near = v + dy + 0.5;
+
                 color[idx] = ptc[0];
+                label[idx] = *(host->label + u_near + v_near*wG[0]);
+                
                 if (!std::isfinite(color[idx])) {
                     energyTH = NAN;
                     return;

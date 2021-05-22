@@ -584,6 +584,8 @@ namespace ldso {
 
         } else {
             memcpy(result->image, photometricUndist->output->image, sizeof(float) * w * h);
+            memcpy(result->label, label->data, sizeof(unsigned char) * w * h);
+            memcpy(result->bel, bel->data, sizeof(unsigned char) * w * h);
         }
 
         applyBlurNoise(result->image);

@@ -120,6 +120,7 @@ namespace ldso {
             // static values
             float color[MAX_RES_PER_POINT];         // colors in host frame
             float weights[MAX_RES_PER_POINT];       // host-weights for respective residuals.
+            unsigned char label[MAX_RES_PER_POINT] = {19};
 
             // ======================================================================== 、、
             // optimization data

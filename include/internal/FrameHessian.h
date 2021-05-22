@@ -213,6 +213,8 @@ namespace ldso {
 
             // dI = dIp[0], the first pyramid
             Vec3f *dI = nullptr;     // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
+            unsigned char *label = nullptr;
+            unsigned char *bel = nullptr;
 
             // Photometric Calibration Stuff
             float frameEnergyTH = 8 * 8 * patternNum;    // set dynamically depending on tracking residual

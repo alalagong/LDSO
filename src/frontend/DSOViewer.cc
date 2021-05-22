@@ -43,7 +43,10 @@ namespace ldso {
                 auto p = feat->point->mpPH;
 
                 for (int i = 0; i < patternNum; i++)
+                {
                     pc[numSparsePoints].color[i] = p->color[i];
+                    pc[numSparsePoints].label[i] = p->label[i];
+                }
                 pc[numSparsePoints].u = p->u;
                 pc[numSparsePoints].v = p->v;
                 pc[numSparsePoints].idpeth = p->idepth_scaled;
@@ -221,7 +224,8 @@ namespace ldso {
                 if (my_sparsifyFactor > 1 && rand() % my_sparsifyFactor != 0) continue;
                 int dx = patternP[pnt][0];
                 int dy = patternP[pnt][1];
-
+                int label = originalInputSparse[i].label[pnt];
+                
                 tmpVertexBuffer[vertexBufferNumPoints][0] = ((originalInputSparse[i].u + dx) * fxi + cxi) * depth;
                 tmpVertexBuffer[vertexBufferNumPoints][1] = ((originalInputSparse[i].v + dy) * fyi + cyi) * depth;
                 tmpVertexBuffer[vertexBufferNumPoints][2] = depth * (1 + 2 * fxi * (rand() / (float) RAND_MAX - 0.5f));
@@ -233,9 +237,9 @@ namespace ldso {
                         tmpColorBuffer[vertexBufferNumPoints][1] = 255;
                         tmpColorBuffer[vertexBufferNumPoints][2] = 255;
                     } else if (originalInputSparse[i].status == 1) {
-                        tmpColorBuffer[vertexBufferNumPoints][0] = 0;
-                        tmpColorBuffer[vertexBufferNumPoints][1] = 255;
-                        tmpColorBuffer[vertexBufferNumPoints][2] = 0;
+                        tmpColorBuffer[vertexBufferNumPoints][0] = color_map.getColorByLabel(label).x();
+                        tmpColorBuffer[vertexBufferNumPoints][1] = color_map.getColorByLabel(label).y();
+                        tmpColorBuffer[vertexBufferNumPoints][2] = color_map.getColorByLabel(label).z();
                     } else if (originalInputSparse[i].status == 2) {
                         tmpColorBuffer[vertexBufferNumPoints][0] = 0;
                         tmpColorBuffer[vertexBufferNumPoints][1] = 0;
@@ -414,7 +418,7 @@ namespace ldso {
         // 左侧的交互窗口
         pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
         //int: 默认值，最小值，最大值，false是否以对数
-        pangolin::Var<int> settings_pointCloudMode("ui.PC_mode", 1, 1, 4, false);
+        pangolin::Var<int> settings_pointCloudMode("ui.PC_mode", 0, 0, 4, false);
         //bool： 1.默认  2.true选择框
         pangolin::Var<bool> settings_showKFCameras("ui.KFCam", true, true);
         pangolin::Var<bool> settings_showCurrentCamera("ui.CurrCam", true, true);

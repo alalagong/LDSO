@@ -78,7 +78,8 @@ public:
     enum DatasetType {
         TUM_MONO,
         KITTI,
-        EUROC
+        EUROC,
+        NEU
     };
 
     ImageFolderReader(DatasetType datasetType,
@@ -137,6 +138,8 @@ public:
             loadTimestampsEUROC();
         } else if (datasetType == KITTI) {
             loadTimestampsKitti();
+        } else if (datasetType == NEU)   {
+            loadTimestampsNEU();
         }
     }
 
@@ -403,7 +406,48 @@ private:
                (int) exposures.size());
     }
 
+    inline void loadTimestampsNEU() {
 
+        LOG(INFO) << "Loading NEU timestamps!" << endl;
+        std::ifstream tr;
+        std::string timesFile = path + "/rgb.txt";
+
+        tr.open(timesFile.c_str());
+        if (!tr) {
+            LOG(INFO) << "cannot find timestamp file at " << path + "/rgb.txt" << endl;
+            return;
+        }
+
+        while (!tr.eof() && tr.good()) {
+
+            char buf[1000] = {0};
+            tr.getline(buf, 1000);
+
+            if (buf[0] == 0)
+                break;
+
+            double stamp;
+            char name_str[1000];
+
+            if (2 == sscanf(buf, "%lf %c", &stamp, &name_str)) {
+                timestamps.push_back(stamp);
+            }
+
+        }
+        tr.close();
+
+        // get the files
+        for (size_t i = 0; i < timestamps.size(); i++) {
+            std::string stamp_str = std::to_string(timestamps[i]);
+            files.push_back(path+"/rgb/"+stamp_str+".png");
+            sem_files.push_back(path+"/semantic/"+stamp_str+".yaml");
+        }
+
+        LOG(INFO) << "Load total " << timestamps.size() << " data entries." << endl;
+
+
+
+    }
     std::vector<ImageAndExposure *> preloadedImages;
     std::vector<std::string> files;
     std::vector<std::string> sem_files;

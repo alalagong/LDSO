@@ -81,13 +81,15 @@ namespace ldso {
         shared_ptr<FrameHessian> fh = frame->frameHessian;
         fh->ab_exposure = image->exposure_time;
         fh->makeImages(image->image, Hcalib->mpCH);
+        fh->label = image->label;
+        fh->bel = image->bel;
+        
+        // cv::Mat label(image->h, image->w, CV_8U, image->label);
+        // cv::Mat bel(image->h, image->w, CV_8U, image->bel);
 
-        cv::Mat label(image->h, image->w, CV_8U, image->label);
-        cv::Mat bel(image->h, image->w, CV_8U, image->bel);
-
-        cv::imshow("label", label*10);
-        cv::imshow("confidence", bel);
-        cv::waitKey(10);
+        // cv::imshow("label", label*10);
+        // cv::imshow("confidence", bel);
+        // cv::waitKey(10);
 
         if (!initialized) {
             LOG(INFO) << "Initializing ... " << endl;

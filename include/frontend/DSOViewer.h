@@ -13,12 +13,56 @@
 #include <thread>
 #include <mutex>
 #include <pangolin/pangolin.h>
+#include <Eigen/Core>
+
 
 using namespace std;
 
 using namespace ldso::internal;
 
 namespace ldso {
+
+struct LabelColorMap
+{
+    LabelColorMap()
+    {
+        label_color_map << 128, 64,128,   // wall
+                           244, 35,232,   // floor 
+                            70, 70, 70,   // cabinet
+                            102,102,156,   // bed
+                            190,153,153,   // chair
+                            153,153,153,   // sofa
+                            
+                            250,170, 30,  // table
+                            220,220,  0,  // door
+                            107,142, 35,  // window
+                            152,251,152,  // bookshelf
+                             70,130,180,  // picture
+                            
+                            220, 20, 60,  // counter
+                            255,  0,  0,  // blinds
+                            0,  0, 142,  // desk
+                             0,  0, 70,  // shelves
+                             0, 60,100,  // curtain
+
+                             0, 80,100,   // dresser
+                             0,  0,230,   // pillow
+                            119, 11, 32,   // mirror
+                            0,  0,  0;  // floor mat
+    }
+
+    Eigen::Vector3i getColorByLabel(int label)
+    {
+        if(label < 0 || label > 19)
+        {
+            std::cout << "[ERROR]: out of label range is " << label << endl;;
+            return Eigen::Vector3i();
+        }
+        return label_color_map.row(label);
+    }
+
+    Eigen::Matrix<int, 20, 3> label_color_map;
+};
 
     //  Visualization for DSO
 
@@ -34,6 +78,7 @@ namespace ldso {
         float relObsBaseline = 0;
         int numGoodRes = 0;
         unsigned char color[ppp];
+        unsigned char label[ppp];
         unsigned char status = 0;
     };
 
@@ -108,6 +153,8 @@ namespace ldso {
         int numGLBufferGoodPoints = 0;
         pangolin::GlBuffer vertexBuffer;
         pangolin::GlBuffer colorBuffer;
+
+        LabelColorMap color_map;
 
     };
 

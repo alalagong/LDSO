@@ -126,7 +126,7 @@ namespace ldso {
     int sparsityFactor = 5;          // not actually a setting, only some legacy stuff for coarse initializer.
 
     bool setting_enableLoopClosing = true;
-    bool setting_fastLoopClosing = true;
+    bool setting_fastLoopClosing = false;
     bool setting_showLoopClosing = false;
 
     void handleKey(char k) {
