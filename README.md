@@ -1,6 +1,27 @@
 # LDSO: Direct Sparse Odometry with Loop Closure
 
-## 正在注释中，不是完整版，主要进行mapping & loop
+这个版本是添加了语义的版本。
+
+需要安装[Yaml-cpp](https://github.com/jbeder/yaml-cpp)库
+
+KITTI数据集的文件需要增加semantic文件夹，代码采用读取yaml文件的形式读语义信息，参考代码
+
+例子：https://github.com/alalagong/SemanticReader
+
+![semantic](doc/structure.png)
+
+运行先给权限
+
+`
+chmod +x run_kitti.bash 
+`
+
+再执行即可
+
+`
+./run_kitti.bash
+`
+
 
 ## Related Publications
 
