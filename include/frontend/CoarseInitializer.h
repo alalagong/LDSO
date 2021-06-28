@@ -27,32 +27,32 @@ namespace ldso {
         float u, v;
 
         // idepth / isgood / energy during optimization.
-        float idepth;
-        bool isGood;
-        Vec2f energy;        // (UenergyPhotometric, energyRegularizer)
+        float idepth;				//!< 该点对应参考帧的逆深度
+        bool isGood;				//!< 点在新图像内, 相机前, 像素值有穷则好
+        Vec2f energy;				//!< [0]残差的平方, [1]正则化项(逆深度减一的平方) // (UenergyPhotometric, energyRegularizer)	
         bool isGood_new;
-        float idepth_new;
-        Vec2f energy_new;
+        float idepth_new;			//!< 该点在新的一帧(当前帧)上的逆深度
+        Vec2f energy_new;			//!< 迭代计算的新的能量
 
-        float iR;
-        float iRSumNum;
+        float iR;					//!< 逆深度的期望值
+        float iRSumNum;				//!< 子点逆深度信息矩阵之和
 
-        float lastHessian;
-        float lastHessian_new;
+        float lastHessian;			//!< 逆深度的Hessian, 即协方差, dd*dd
+        float lastHessian_new;		//!< 新一次迭代的协方差
 
         // max stepsize for idepth (corresponding to max. movement in pixel-space).
-        float maxstep;
+        float maxstep;				//!< 逆深度增加的最大步长
 
         // idx (x+y*w) of closest point one pyramid level above.
-        int parent;
-        float parentDist;
+        int parent;		  			//!< 上一层中该点的父节点 (距离最近的)的id
+        float parentDist;			//!< 上一层中与父节点的距离
 
         // idx (x+y*w) of up to 10 nearest points in pixel space.
-        int neighbours[10];
-        float neighboursDist[10];
+        int neighbours[10];			//!< 图像中离该点最近的10个点
+        float neighboursDist[10];   //!< 最近10个点的距离
 
-        float my_type;
-        float outlierTH;
+        float my_type; 				//!< 第0层提取是1, 2, 4, 对应d, 2d, 4d, 其它层是1
+        float outlierTH; 			//!< 外点阈值
     };
 
     /**

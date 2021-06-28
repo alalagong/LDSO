@@ -21,6 +21,7 @@ using namespace ldso::internal;
 
 namespace ldso {
 
+    // 相比DSO LDSO中的FullSystem的构造函数做了精简，coarseTracker的分配放在初始化列表中进行
     FullSystem::FullSystem(shared_ptr<ORBVocabulary> voc) :
         coarseDistanceMap(new CoarseDistanceMap(wG[0], hG[0])),
         coarseTracker(new CoarseTracker(wG[0], hG[0])),
@@ -40,13 +41,14 @@ namespace ldso {
         Hcalib->CreateCH(Hcalib);
         lastCoarseRMSE.setConstant(100);
         ef->red = &this->threadReduce;
-        mappingThread = thread(&FullSystem::mappingLoop, this);
+        mappingThread = thread(&FullSystem::mappingLoop, this); // DSO的map线程
 
         pixelSelector = shared_ptr<PixelSelector>(new PixelSelector(wG[0], hG[0]));
         selectionMap = new float[wG[0] * hG[0]];
 
         if (setting_enableLoopClosing) {
             loopClosing = shared_ptr<LoopClosing>(new LoopClosing(this));
+            // 启动回环检测的线程，线程的分配在LoopClosing的构造函数中
             if (setting_fastLoopClosing)
                 LOG(INFO) << "Use fast loop closing" << endl;
         } else {
@@ -65,13 +67,23 @@ namespace ldso {
         }
     }
 
+    /********************************
+     * @ function:
+     * 
+     * @ param: 	image		标定后的辐照度和曝光时间
+     * @			id			
+     * 
+     * @ note: start from here, the read data interface
+     *******************************/
     void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
         if (isLost)
             return;
+        //[ ***step 1*** ] track线程锁
         unique_lock<mutex> lock(trackMutex);
 
         LOG(INFO) << "*** taking frame " << id << " ***" << endl;
 
+        //[ ***step 2*** ] 创建Frame, FrameHessian, 并进行相应初始化, 并存储所有帧
         // create frame and frame hessian
         shared_ptr<Frame> frame(new Frame(image->timestamp));
         frame->CreateFH(frame);
@@ -79,16 +91,20 @@ namespace ldso {
 
         // ==== make images ==== //
         shared_ptr<FrameHessian> fh = frame->frameHessian;
+        //[ ***step 3*** ] 得到曝光时间, 生成金字塔, 计算整个图像梯度
         fh->ab_exposure = image->exposure_time;
         fh->makeImages(image->image, Hcalib->mpCH);
 
+        //[ ***step 4*** ] 进行初始化
         if (!initialized) {
             LOG(INFO) << "Initializing ... " << endl;
             // use initializer
+            //[ ***step 4.1*** ] 加入第一帧
             if (coarseInitializer->frameID < 0) {   // first frame not set, set it
                 coarseInitializer->setFirst(Hcalib->mpCH, fh);
             } else if (coarseInitializer->trackFrame(fh)) {
                 // init succeeded
+                //[ ***step 4.2*** ] 跟踪成功, 完成初始化
                 initializeFromInitializer(fh);
                 lock.unlock();
                 deliverTrackedFrame(fh, true);  // create new keyframe
@@ -102,7 +118,9 @@ namespace ldso {
         } else {
             // init finished, do tracking
             // =========================== SWAP tracking reference?. =========================
+            //[ ***step 5*** ] 对新来的帧进行跟踪, 得到位姿光度, 判断跟踪状态
             if (coarseTracker_forNewKF->refFrameID > coarseTracker->refFrameID) {
+                // 交换参考帧和当前帧的coarseTracker
                 unique_lock<mutex> crlock(coarseTrackerSwapMutex);
                 LOG(INFO) << "swap coarse tracker to " << coarseTracker_forNewKF->refFrameID << endl;
                 auto tmp = coarseTracker;
@@ -121,7 +139,7 @@ namespace ldso {
                 isLost = true;
                 return;
             }
-
+//[ ***step 6*** ] 判断是否插入关键帧
             bool needToMakeKF = false;
             if (setting_keyframesPerSecond > 0) {
                 // make key frame by time
@@ -132,16 +150,14 @@ namespace ldso {
                 Vec2 refToFh = AffLight::fromToVecExposure(coarseTracker->lastRef->ab_exposure, fh->ab_exposure,
                                                            coarseTracker->lastRef_aff_g2l, fh->aff_g2l());
 
-                float b = setting_kfGlobalWeight * setting_maxShiftWeightT * sqrtf((double) tres[1]) /
-                          (wG[0] + hG[0]) +
-                          setting_kfGlobalWeight * setting_maxShiftWeightR * sqrtf((double) tres[2]) /
-                          (wG[0] + hG[0]) +
-                          setting_kfGlobalWeight * setting_maxShiftWeightRT * sqrtf((double) tres[3]) /
-                          (wG[0] + hG[0]) +
-                          setting_kfGlobalWeight * setting_maxAffineWeight * fabs(logf((float) refToFh[0]));
+                // BRIGHTNESS CHECK 光度检查
+                float b = setting_kfGlobalWeight * setting_maxShiftWeightT * sqrtf((double) tres[1]) / (wG[0] + hG[0]) + // 平移像素位移
+                          setting_kfGlobalWeight * setting_maxShiftWeightR * sqrtf((double) tres[2]) / (wG[0] + hG[0]) + // 旋转像素位移
+                          setting_kfGlobalWeight * setting_maxShiftWeightRT * sqrtf((double) tres[3]) / (wG[0] + hG[0]) + // 旋转+平移像素位移
+                          setting_kfGlobalWeight * setting_maxAffineWeight * fabs(logf((float) refToFh[0])); // 光度变化大
 
                 bool b1 = b > 1;
-                bool b2 = 2 * coarseTracker->firstCoarseRMSE < tres[0];
+                bool b2 = 2 * coarseTracker->firstCoarseRMSE < tres[0]; // 误差能量变化太大(最初的两倍)
 
                 needToMakeKF = allFrameHistory.size() == 1 || b1 || b2;
             }
@@ -149,6 +165,7 @@ namespace ldso {
             if (viewer)
                 viewer->publishCamPose(fh->frame, Hcalib->mpCH);
 
+            //[ ***step 7*** ] 把该帧发布出去
             lock.unlock();
             LOG(INFO) << "deliver frame " << fh->frame->id << endl;
             deliverTrackedFrame(fh, needToMakeKF);
@@ -157,7 +174,9 @@ namespace ldso {
         }
     }
 
+    //@ 把跟踪的帧, 给到建图线程, 设置成关键帧或非关键帧
     void FullSystem::deliverTrackedFrame(shared_ptr<FrameHessian> fh, bool needKF) {
+        //! 顺序执行
         if (linearizeOperation) {
             if (needKF) {
                 makeKeyFrame(fh);
@@ -170,7 +189,7 @@ namespace ldso {
             trackedFrameSignal.notify_all();
             while (coarseTracker_forNewKF->refFrameID == -1 && coarseTracker->refFrameID == -1) {
                 LOG(INFO) << "wait for mapped frame signal" << endl;
-                mappedFrameSignal.wait(lock);
+                mappedFrameSignal.wait(lock); // 当没有跟踪的图像, 就一直阻塞trackMapSyncMutex, 直到notify
             }
             lock.unlock();
         }
@@ -1799,7 +1818,7 @@ namespace ldso {
         );
         LOG(INFO) << string(buff);
     }
-
+    //@ 建图线程
     void FullSystem::mappingLoop() {
 
         unique_lock<mutex> lock(trackMapSyncMutex);
@@ -1808,7 +1827,7 @@ namespace ldso {
 
             // wait an unmapped frame
             while (unmappedTrackedFrames.size() == 0) {
-                trackedFrameSignal.wait(lock);
+                trackedFrameSignal.wait(lock); // 没有图像等待trackedFrameSignal唤醒
                 if (!runMapping) break;
             }
             if (!runMapping) break;
@@ -1820,10 +1839,10 @@ namespace ldso {
 
             // guaranteed to make a KF for the very first two tracked frames.
             if (globalMap->NumFrames() <= 2) {
-                lock.unlock();
+                lock.unlock(); // 运行makeKeyFrame是不会影响unmappedTrackedFrames的, 所以解锁
                 makeKeyFrame(fh);
                 lock.lock();
-                mappedFrameSignal.notify_all();
+                mappedFrameSignal.notify_all(); // 结束前唤醒
                 continue;
             }
 
@@ -1836,7 +1855,7 @@ namespace ldso {
                 makeNonKeyFrame(fh);
                 lock.lock();
 
-                if (needToKetchupMapping && unmappedTrackedFrames.size() > 0) {
+                if (needToKetchupMapping && unmappedTrackedFrames.size() > 0) { // 释放多余信息
                     auto fr = unmappedTrackedFrames.front();
                     shared_ptr<FrameHessian> fh = fr->frameHessian;
                     unmappedTrackedFrames.pop_front();
@@ -1846,7 +1865,7 @@ namespace ldso {
                     }
                 }
             } else {
-                if (setting_realTimeMaxKF || needNewKFAfter >= int(frames.back()->id)) {
+                if (setting_realTimeMaxKF || needNewKFAfter >= int(frames.back()->id)) { // 后面需要关键帧
                     lock.unlock();
                     makeKeyFrame(fh);
                     needToKetchupMapping = false;
